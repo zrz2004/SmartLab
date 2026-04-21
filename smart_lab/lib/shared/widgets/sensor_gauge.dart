@@ -39,11 +39,11 @@ class SensorGauge extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppSpacing.borderRadiusLg,
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: AppColors.cardShadow,
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -83,7 +83,7 @@ class SensorGauge extends StatelessWidget {
                 alignment: Alignment.center,
                 children: [
                   // 背景圆环
-                  SizedBox(
+                  const SizedBox(
                     width: 80,
                     height: 80,
                     child: CircularProgressIndicator(

@@ -175,10 +175,13 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
       switch (alert.level) {
         case AlertLevel.critical:
           score -= 15;
+          break;
         case AlertLevel.warning:
           score -= 5;
+          break;
         case AlertLevel.info:
           score -= 1;
+          break;
       }
     }
     

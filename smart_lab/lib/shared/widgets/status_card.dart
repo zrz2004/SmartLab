@@ -47,11 +47,11 @@ class StatusCard extends StatelessWidget {
             color: borderColor,
             width: borderWidth,
           ),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: AppColors.cardShadow,
               blurRadius: 10,
-              offset: const Offset(0, 2),
+              offset: Offset(0, 2),
             ),
           ],
         ),
@@ -64,7 +64,7 @@ class StatusCard extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: AppSpacing.borderRadiusMd,
               ),
               child: Icon(

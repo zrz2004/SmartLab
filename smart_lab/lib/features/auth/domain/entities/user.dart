@@ -1,21 +1,18 @@
 import 'package:equatable/equatable.dart';
 
-/// 用户实体
-/// 
-/// 存储用户基本信息和权限数据
 class User extends Equatable {
   final String id;
-  final String username;         // 学号/工号
-  final String name;             // 真实姓名
-  final UserRole role;           // 用户角色
-  final String? department;      // 院系
-  final String? phone;           // 手机号
-  final String? email;           // 邮箱
-  final String? avatarUrl;       // 头像
-  final List<String> accessibleLabIds;  // 可访问的实验室ID列表
-  final DateTime? lastLoginAt;   // 最后登录时间
-  final bool isActive;           // 账户是否激活
-  
+  final String username;
+  final String name;
+  final UserRole role;
+  final String? department;
+  final String? phone;
+  final String? email;
+  final String? avatarUrl;
+  final List<String> accessibleLabIds;
+  final DateTime? lastLoginAt;
+  final bool isActive;
+
   const User({
     required this.id,
     required this.username,
@@ -29,11 +26,10 @@ class User extends Equatable {
     this.lastLoginAt,
     this.isActive = true,
   });
-  
-  /// 从 JSON 创建
+
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] as String,
+      id: json['id'].toString(),
       username: json['username'] as String,
       name: json['name'] as String,
       role: UserRole.fromString(json['role'] as String),
@@ -41,15 +37,12 @@ class User extends Equatable {
       phone: json['phone'] as String?,
       email: json['email'] as String?,
       avatarUrl: json['avatar_url'] as String?,
-      accessibleLabIds: List<String>.from(json['accessible_lab_ids'] ?? []),
-      lastLoginAt: json['last_login_at'] != null 
-          ? DateTime.parse(json['last_login_at'] as String)
-          : null,
+      accessibleLabIds: List<String>.from(json['accessible_lab_ids'] ?? const <String>[]),
+      lastLoginAt: json['last_login_at'] != null ? DateTime.parse(json['last_login_at'] as String) : null,
       isActive: json['is_active'] as bool? ?? true,
     );
   }
-  
-  /// 转换为 JSON
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -65,110 +58,54 @@ class User extends Equatable {
       'is_active': isActive,
     };
   }
-  
-  /// 复制并修改
-  User copyWith({
-    String? id,
-    String? username,
-    String? name,
-    UserRole? role,
-    String? department,
-    String? phone,
-    String? email,
-    String? avatarUrl,
-    List<String>? accessibleLabIds,
-    DateTime? lastLoginAt,
-    bool? isActive,
-  }) {
-    return User(
-      id: id ?? this.id,
-      username: username ?? this.username,
-      name: name ?? this.name,
-      role: role ?? this.role,
-      department: department ?? this.department,
-      phone: phone ?? this.phone,
-      email: email ?? this.email,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
-      accessibleLabIds: accessibleLabIds ?? this.accessibleLabIds,
-      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
-      isActive: isActive ?? this.isActive,
-    );
-  }
-  
-  /// 是否有指定实验室的访问权限
+
   bool hasAccessToLab(String labId) {
     if (role == UserRole.admin) return true;
     return accessibleLabIds.contains(labId);
   }
-  
-  /// 是否可以控制设备
-  bool get canControlDevices => 
-      role == UserRole.admin || 
-      role == UserRole.teacher || 
-      role == UserRole.graduate;
-  
-  /// 是否可以管理实验室
-  bool get canManageLab =>
-      role == UserRole.admin || role == UserRole.teacher;
-  
-  /// 是否可以确认报警
-  bool get canAcknowledgeAlerts =>
-      role != UserRole.undergraduate;
-  
-  /// 是否可以管理危化品
+
+  bool get canControlDevices => role == UserRole.admin || role == UserRole.teacher || role == UserRole.graduate;
+  bool get canManageLab => role == UserRole.admin || role == UserRole.teacher;
+  bool get canAcknowledgeAlerts => role != UserRole.undergraduate;
+  String get roleDisplayName => role.displayName;
+
   bool canManageChemicals(String action) {
     if (action == 'view') return true;
-    if (action == 'checkout') {
-      return role == UserRole.admin || 
-             role == UserRole.teacher ||
-             role == UserRole.graduate;
-    }
-    if (action == 'checkin' || action == 'manage') {
-      return role == UserRole.admin || role == UserRole.teacher;
-    }
+    if (action == 'checkout') return role == UserRole.admin || role == UserRole.teacher || role == UserRole.graduate;
+    if (action == 'checkin' || action == 'manage') return role == UserRole.admin || role == UserRole.teacher;
     return false;
   }
-  
+
   @override
-  List<Object?> get props => [
-    id, 
-    username, 
-    name, 
-    role, 
-    accessibleLabIds,
-    isActive,
-  ];
+  List<Object?> get props => [id, username, name, role, accessibleLabIds, isActive];
 }
 
-/// 用户角色枚举
 enum UserRole {
-  admin,          // 系统管理员
-  teacher,        // 教师/实验室负责人
-  graduate,       // 研究生
-  undergraduate;  // 本科生助理
-  
+  admin,
+  teacher,
+  graduate,
+  undergraduate;
+
   static UserRole fromString(String value) {
     return UserRole.values.firstWhere(
       (e) => e.name == value.toLowerCase(),
       orElse: () => UserRole.undergraduate,
     );
   }
-  
-  /// 显示名称
+
   String get displayName {
     switch (this) {
       case UserRole.admin:
-        return '系统管理员';
+        return 'Admin';
       case UserRole.teacher:
-        return '教师';
+        return 'Teacher';
       case UserRole.graduate:
-        return '研究生';
+        return 'Graduate';
       case UserRole.undergraduate:
-        return '本科生助理';
+        return 'Assistant';
     }
   }
-  
-  /// 权限等级 (用于比较)
+
   int get level {
     switch (this) {
       case UserRole.admin:
@@ -181,9 +118,6 @@ enum UserRole {
         return 40;
     }
   }
-  
-  /// 是否可以管理指定角色的用户
-  bool canManageRole(UserRole targetRole) {
-    return level > targetRole.level;
-  }
+
+  bool canManageRole(UserRole targetRole) => level > targetRole.level;
 }

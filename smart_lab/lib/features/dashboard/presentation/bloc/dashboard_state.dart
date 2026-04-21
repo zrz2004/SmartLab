@@ -55,7 +55,7 @@ class DashboardState extends Equatable {
         buildingId: '',
         roomId: '',
         timestamp: DateTime.now(),
-        values: {},
+        values: const {},
       ),
     );
     return envData.temperature;
@@ -71,7 +71,7 @@ class DashboardState extends Equatable {
         buildingId: '',
         roomId: '',
         timestamp: DateTime.now(),
-        values: {},
+        values: const {},
       ),
     );
     return envData.humidity;
@@ -87,7 +87,7 @@ class DashboardState extends Equatable {
         buildingId: '',
         roomId: '',
         timestamp: DateTime.now(),
-        values: {},
+        values: const {},
       ),
     );
     return powerData.power;

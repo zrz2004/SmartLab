@@ -1,5 +1,5 @@
 name: smart_lab
-description: 智慧实验室安全监测与预警系统 - 基于物联网技术的实验室安全管理移动端应用
+description: 智慧实验室安全监测与预警系统
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -10,62 +10,46 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
-  # 状态管理 - BLoC (Business Logic Component)
+
   flutter_bloc: ^8.1.3
   bloc: ^8.1.2
   equatable: ^2.0.5
-  
-  # 网络通信
-  dio: ^5.4.0                    # HTTP客户端
-  mqtt_client: ^10.0.0           # MQTT通信
-  web_socket_channel: ^2.4.0     # WebSocket支持
-  
-  # 本地存储
+
+  dio: ^5.4.0
+  mqtt_client: ^10.0.0
+  web_socket_channel: ^2.4.0
+
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  flutter_secure_storage: ^9.0.0  # 安全存储Token
-  
-  # UI组件
-  fl_chart: ^0.66.0              # 图表渲染
-  flutter_svg: ^2.0.9            # SVG支持
-  cached_network_image: ^3.3.0   # 图片缓存
-  shimmer: ^3.0.0                # 加载骨架屏
-  
-  # 推送通知
+  flutter_secure_storage: ^9.0.0
+
+  fl_chart: ^0.66.0
+  flutter_svg: ^2.0.9
+  cached_network_image: ^3.3.0
+  shimmer: ^3.0.0
+  image_picker: ^1.1.2
+
   firebase_core: ^2.24.2
   firebase_messaging: ^14.7.10
   flutter_local_notifications: ^18.0.0
-  
-  # 工具库
-  intl: ^0.18.1                  # 国际化
-  logger: ^2.0.2                 # 日志
-  uuid: ^4.2.1                   # UUID生成
-  
-  # 生物识别
+
+  intl: ^0.18.1
+  logger: ^2.0.2
+  uuid: ^4.2.1
+
   local_auth: ^2.1.6
-  
-  # 路由
   go_router: ^13.0.0
-  
-  # 依赖注入
   get_it: ^7.6.4
   injectable: ^2.3.2
-  
+
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
-  build_runner: ^2.4.7
-  hive_generator: ^2.0.1
-  injectable_generator: ^2.4.1
-  mockito: ^5.4.4
-  bloc_test: ^9.1.5
   flutter_launcher_icons: ^0.13.1
 
-# App图标配置
 flutter_launcher_icons:
   android: true
   ios: false
@@ -79,21 +63,7 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
-  
+
   assets:
     - assets/images/
     - assets/icons/
-
-  # 暂时使用系统字体，待添加实际字体文件后再启用
-  # fonts:
-  #   - family: PingFang
-  #     fonts:
-  #       - asset: assets/fonts/PingFang-Regular.ttf
-  #       - asset: assets/fonts/PingFang-Medium.ttf
-  #         weight: 500
-  #       - asset: assets/fonts/PingFang-Bold.ttf
-  #         weight: 700
-  #   - family: DINAlternate
-  #     fonts:
-  #       - asset: assets/fonts/DINAlternate-Bold.ttf
-  #         weight: 700

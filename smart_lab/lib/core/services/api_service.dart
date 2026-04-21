@@ -3,99 +3,93 @@ import 'package:logger/logger.dart';
 
 import '../constants/api_endpoints.dart';
 
-/// API 服务
-/// 
-/// 负责与后端 REST API 通信
-/// - 设备管理
-/// - 用户认证
-/// - 历史数据查询
-/// - 危化品管理
 class ApiService {
-  // 生产服务器地址
-  static const String _baseUrl = 'http://47.109.158.254:3000/api/v1';
+  static const String _baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://47.109.158.254:3000/api/v1',
+  );
   static const Duration _timeout = Duration(seconds: 30);
-  
+
   final Logger _logger = Logger();
   late final Dio _dio;
-  
+
   String? _accessToken;
   String? _refreshToken;
-  
+
   ApiService() {
-    _dio = Dio(BaseOptions(
-      baseUrl: _baseUrl,
-      connectTimeout: _timeout,
-      receiveTimeout: _timeout,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    ));
-    
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: _baseUrl,
+        connectTimeout: _timeout,
+        receiveTimeout: _timeout,
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
     _setupInterceptors();
   }
-  
-  /// 配置拦截器
+
   void _setupInterceptors() {
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        // 添加认证 Token
-        if (_accessToken != null) {
-          options.headers['Authorization'] = 'Bearer $_accessToken';
-        }
-        _logger.d('API 请求: ${options.method} ${options.path}');
-        handler.next(options);
-      },
-      onResponse: (response, handler) {
-        _logger.d('API 响应: ${response.statusCode}');
-        handler.next(response);
-      },
-      onError: (error, handler) async {
-        _logger.e('API 错误: ${error.message}');
-        
-        // Token 过期，尝试刷新
-        if (error.response?.statusCode == 401 && _refreshToken != null) {
-          try {
-            await _refreshAccessToken();
-            // 重试原请求
-            final retryResponse = await _dio.fetch(error.requestOptions);
-            handler.resolve(retryResponse);
-            return;
-          } catch (e) {
-            // Token 刷新失败，需要重新登录
-            _accessToken = null;
-            _refreshToken = null;
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (_accessToken != null) {
+            options.headers['Authorization'] = 'Bearer $_accessToken';
           }
-        }
-        
-        handler.next(error);
-      },
-    ));
+          _logger.d('API request: ${options.method} ${options.path}');
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          _logger.d('API response: ${response.statusCode}');
+          handler.next(response);
+        },
+        onError: (error, handler) async {
+          _logger.e('API error: ${error.message}');
+
+          if (error.response?.statusCode == 401 && _refreshToken != null) {
+            try {
+              await _refreshAccessToken();
+              final requestOptions = error.requestOptions;
+              requestOptions.headers['Authorization'] = 'Bearer $_accessToken';
+              final retryResponse = await _dio.fetch(requestOptions);
+              handler.resolve(retryResponse);
+              return;
+            } catch (_) {
+              _accessToken = null;
+              _refreshToken = null;
+            }
+          }
+
+          handler.next(error);
+        },
+      ),
+    );
   }
-  
-  /// 设置 Token
-  void setTokens({required String accessToken, required String refreshToken}) {
+
+  void setTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
   }
-  
-  /// 刷新 Access Token
+
   Future<void> _refreshAccessToken() async {
     final response = await _dio.post(
       ApiEndpoints.refreshToken,
       data: {'refresh_token': _refreshToken},
       options: Options(headers: {'Authorization': null}),
     );
-    
+
     if (response.statusCode == 200) {
-      _accessToken = response.data['access_token'];
-      _refreshToken = response.data['refresh_token'];
+      _accessToken = response.data['access_token'] as String?;
+      _refreshToken = response.data['refresh_token'] as String?;
     }
   }
-  
-  // ==================== 认证接口 ====================
-  
-  /// 用户登录
+
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -107,32 +101,152 @@ class ApiService {
         'password': password,
       },
     );
-    
+
     if (response.statusCode == 200) {
-      final data = response.data;
+      final data = Map<String, dynamic>.from(response.data as Map);
       setTokens(
-        accessToken: data['access_token'],
-        refreshToken: data['refresh_token'],
+        accessToken: data['access_token'] as String,
+        refreshToken: data['refresh_token'] as String,
       );
       return data;
     }
-    
+
     throw DioException(
       requestOptions: response.requestOptions,
       message: '登录失败',
     );
   }
-  
-  /// 用户登出
+
+  Future<Map<String, dynamic>> registerUser({
+    required String username,
+    required String password,
+    required String name,
+    required String email,
+    String? phone,
+    String requestedRole = 'undergraduate',
+  }) async {
+    final response = await _dio.post(
+      ApiEndpoints.register,
+      data: {
+        'username': username,
+        'password': password,
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'requested_role': requestedRole,
+      },
+      options: Options(headers: {'Authorization': null}),
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<void> logout() async {
     await _dio.post(ApiEndpoints.logout);
     _accessToken = null;
     _refreshToken = null;
   }
-  
-  // ==================== 设备接口 ====================
-  
-  /// 获取设备列表
+
+  Future<Map<String, dynamic>> getCurrentUser() async {
+    final response = await _dio.get(ApiEndpoints.profile);
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingRegistrations() async {
+    final response = await _dio.get(ApiEndpoints.pendingRegistrations);
+    return List<Map<String, dynamic>>.from(response.data as List);
+  }
+
+  Future<Map<String, dynamic>> approveRegistration({
+    required String requestId,
+    required List<String> labIds,
+    required String role,
+  }) async {
+    final response = await _dio.post(
+      '${ApiEndpoints.pendingRegistrations}/$requestId/approve',
+      data: {
+        'lab_ids': labIds,
+        'role': role,
+      },
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> rejectRegistration({
+    required String requestId,
+    required String reason,
+  }) async {
+    final response = await _dio.post(
+      '${ApiEndpoints.pendingRegistrations}/$requestId/reject',
+      data: {'reason': reason},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> getPermissionsMe() async {
+    final response = await _dio.get(ApiEndpoints.permissionsMe);
+    return List<Map<String, dynamic>>.from(response.data as List);
+  }
+
+  Future<List<Map<String, dynamic>>> getAccessibleLabs() async {
+    final response = await _dio.get(ApiEndpoints.accessibleLabs);
+    return List<Map<String, dynamic>>.from(response.data as List);
+  }
+
+  Future<Map<String, dynamic>> selectLab(String labId) async {
+    final response = await _dio.post(
+      ApiEndpoints.selectLab,
+      data: {'lab_id': labId},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> getLabContext(String labId) async {
+    final response = await _dio.get(ApiEndpoints.labContext(labId));
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> uploadMedia({
+    required List<int> fileBytes,
+    required String fileName,
+    required String labId,
+    required String sceneType,
+    required String deviceType,
+    String? targetId,
+  }) async {
+    final formData = FormData.fromMap({
+      'lab_id': labId,
+      'scene_type': sceneType,
+      'device_type': deviceType,
+      'target_id': targetId,
+      'file': MultipartFile.fromBytes(
+        fileBytes,
+        filename: fileName,
+      ),
+    });
+
+    final response = await _dio.post(
+      ApiEndpoints.mediaUpload,
+      data: formData,
+      options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> createAiInspection({
+    required Map<String, dynamic> payload,
+  }) async {
+    final response = await _dio.post(
+      ApiEndpoints.aiInspections,
+      data: payload,
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> getAiInspection(String inspectionId) async {
+    final response = await _dio.get('${ApiEndpoints.aiInspections}/$inspectionId');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<List<Map<String, dynamic>>> getDevices({
     String? roomId,
     String? type,
@@ -144,17 +258,15 @@ class ApiService {
         if (type != null) 'type': type,
       },
     );
-    
-    return List<Map<String, dynamic>>.from(response.data);
+
+    return List<Map<String, dynamic>>.from(response.data as List);
   }
-  
-  /// 获取设备详情
+
   Future<Map<String, dynamic>> getDeviceDetail(String deviceId) async {
     final response = await _dio.get('${ApiEndpoints.devices}/$deviceId');
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
-  
-  /// 控制设备
+
   Future<bool> controlDevice({
     required String deviceId,
     required String action,
@@ -168,13 +280,10 @@ class ApiService {
         if (twoFactorToken != null) 'token': twoFactorToken,
       },
     );
-    
+
     return response.statusCode == 200;
   }
-  
-  // ==================== 遥测数据接口 ====================
-  
-  /// 获取历史遥测数据
+
   Future<List<Map<String, dynamic>>> getTelemetryHistory({
     required String deviceId,
     required DateTime start,
@@ -190,13 +299,10 @@ class ApiService {
         'interval': interval,
       },
     );
-    
-    return List<Map<String, dynamic>>.from(response.data);
+
+    return List<Map<String, dynamic>>.from(response.data as List);
   }
-  
-  // ==================== 危化品接口 ====================
-  
-  /// 获取危化品库存
+
   Future<List<Map<String, dynamic>>> getChemicalInventory({
     String? status,
     String? cabinetId,
@@ -208,17 +314,15 @@ class ApiService {
         if (cabinetId != null) 'cabinetId': cabinetId,
       },
     );
-    
-    return List<Map<String, dynamic>>.from(response.data);
+
+    return List<Map<String, dynamic>>.from(response.data as List);
   }
-  
-  /// 获取危化品详情
+
   Future<Map<String, dynamic>> getChemicalDetail(String chemicalId) async {
     final response = await _dio.get('${ApiEndpoints.chemicalInventory}/$chemicalId');
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
-  
-  /// 获取危化品操作日志
+
   Future<List<Map<String, dynamic>>> getChemicalLogs({
     String? chemicalId,
     int limit = 20,
@@ -230,13 +334,10 @@ class ApiService {
         'limit': limit,
       },
     );
-    
-    return List<Map<String, dynamic>>.from(response.data);
+
+    return List<Map<String, dynamic>>.from(response.data as List);
   }
-  
-  // ==================== 报警接口 ====================
-  
-  /// 获取报警列表
+
   Future<List<Map<String, dynamic>>> getAlerts({
     String? level,
     bool? acknowledged,
@@ -250,30 +351,22 @@ class ApiService {
         'limit': limit,
       },
     );
-    
-    return List<Map<String, dynamic>>.from(response.data);
+
+    return List<Map<String, dynamic>>.from(response.data as List);
   }
-  
-  /// 确认报警
+
   Future<bool> acknowledgeAlert(String alertId) async {
-    final response = await _dio.post(
-      '${ApiEndpoints.alerts}/$alertId/acknowledge',
-    );
-    
+    final response = await _dio.post(ApiEndpoints.acknowledgeAlert(alertId));
     return response.statusCode == 200;
   }
-  
-  // ==================== 实验室接口 ====================
-  
-  /// 获取实验室列表
+
   Future<List<Map<String, dynamic>>> getLabs() async {
     final response = await _dio.get(ApiEndpoints.labs);
-    return List<Map<String, dynamic>>.from(response.data);
+    return List<Map<String, dynamic>>.from(response.data as List);
   }
-  
-  /// 获取实验室安全评分
+
   Future<Map<String, dynamic>> getLabSafetyScore(String labId) async {
     final response = await _dio.get('${ApiEndpoints.labs}/$labId/safety-score');
-    return response.data;
+    return Map<String, dynamic>.from(response.data as Map);
   }
 }

@@ -2,6 +2,9 @@ part of 'chemicals_bloc.dart';
 
 enum ChemicalsStatus { initial, loading, loaded, error }
 
+const Object _selectedHazardClassSentinel = Object();
+const Object _errorMessageSentinel = Object();
+
 class ChemicalsState extends Equatable {
   final ChemicalsStatus status;
   final List<Chemical> chemicals;
@@ -30,22 +33,24 @@ class ChemicalsState extends Equatable {
     List<Chemical>? chemicals,
     List<Chemical>? filteredChemicals,
     String? searchQuery,
-    ChemicalHazardClass? selectedHazardClass,
+    Object? selectedHazardClass = _selectedHazardClassSentinel,
     bool? isScanning,
     Chemical? scannedChemical,
     List<ChemicalLog>? recentLogs,
-    String? errorMessage,
+    Object? errorMessage = _errorMessageSentinel,
   }) {
     return ChemicalsState(
       status: status ?? this.status,
       chemicals: chemicals ?? this.chemicals,
       filteredChemicals: filteredChemicals ?? this.filteredChemicals,
       searchQuery: searchQuery ?? this.searchQuery,
-      selectedHazardClass: selectedHazardClass ?? this.selectedHazardClass,
+      selectedHazardClass: identical(selectedHazardClass, _selectedHazardClassSentinel)
+          ? this.selectedHazardClass
+          : selectedHazardClass as ChemicalHazardClass?,
       isScanning: isScanning ?? this.isScanning,
       scannedChemical: scannedChemical ?? this.scannedChemical,
       recentLogs: recentLogs ?? this.recentLogs,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: identical(errorMessage, _errorMessageSentinel) ? this.errorMessage : errorMessage as String?,
     );
   }
   

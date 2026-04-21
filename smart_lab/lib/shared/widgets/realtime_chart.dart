@@ -34,14 +34,14 @@ class RealtimeChart extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: AppSpacing.cardPadding,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AppSpacing.borderRadiusLg,
-        boxShadow: [
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: AppSpacing.borderRadiusLg,
+        boxShadow: const [
           BoxShadow(
             color: AppColors.cardShadow,
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -134,7 +134,7 @@ class RealtimeChart extends StatelessWidget {
                   drawVerticalLine: false,
                   horizontalInterval: _calculateInterval(),
                   getDrawingHorizontalLine: (value) {
-                    return FlLine(
+                    return const FlLine(
                       color: AppColors.divider,
                       strokeWidth: 1,
                     );
@@ -188,8 +188,8 @@ class RealtimeChart extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          (gradientColor ?? lineColor).withOpacity(0.3),
-                          (gradientColor ?? lineColor).withOpacity(0.0),
+                          (gradientColor ?? lineColor).withValues(alpha: 0.3),
+                          (gradientColor ?? lineColor).withValues(alpha: 0.0),
                         ],
                       ),
                     ),
@@ -201,14 +201,14 @@ class RealtimeChart extends StatelessWidget {
                     if (warningThreshold != null)
                       HorizontalLine(
                         y: warningThreshold!,
-                        color: AppColors.warning.withOpacity(0.5),
+                        color: AppColors.warning.withValues(alpha: 0.5),
                         strokeWidth: 1,
                         dashArray: [5, 5],
                       ),
                     if (criticalThreshold != null)
                       HorizontalLine(
                         y: criticalThreshold!,
-                        color: AppColors.critical.withOpacity(0.5),
+                        color: AppColors.critical.withValues(alpha: 0.5),
                         strokeWidth: 1,
                         dashArray: [5, 5],
                       ),

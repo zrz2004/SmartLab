@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: SmartLab Backend API
+  version: 0.1.0
+servers:
+  - url: http://47.109.158.254:3000/api/v1
+paths:
+  /auth/register:
+    post:
+      summary: Submit registration request
+      responses:
+        '202':
+          description: Pending review
+  /auth/login:
+    post:
+      summary: Login
+      responses:
+        '200':
+          description: Logged in
+  /auth/logout:
+    post:
+      summary: Logout
+      responses:
+        '204':
+          description: Logged out
+  /auth/refresh:
+    post:
+      summary: Refresh token
+      responses:
+        '200':
+          description: Refreshed
+  /auth/me:
+    get:
+      summary: Current user
+      responses:
+        '200':
+          description: Current user profile
+  /auth/pending:
+    get:
+      summary: Pending registrations
+      responses:
+        '200':
+          description: Pending list
+  /auth/pending/{id}/approve:
+    post:
+      summary: Approve registration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Approved
+  /auth/pending/{id}/reject:
+    post:
+      summary: Reject registration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rejected
+  /permissions/me:
+    get:
+      summary: Effective permissions
+      responses:
+        '200':
+          description: Permission list
+  /labs/accessible:
+    get:
+      summary: Accessible labs
+      responses:
+        '200':
+          description: Lab list
+  /labs/select:
+    post:
+      summary: Switch current lab
+      responses:
+        '200':
+          description: Switched
+  /labs/{id}/context:
+    get:
+      summary: Lab context payload
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Context payload
+  /media/upload:
+    post:
+      summary: Proxy upload to NocoDB
+      responses:
+        '202':
+          description: Uploaded
+  /ai-inspections:
+    post:
+      summary: Create AI inspection
+      responses:
+        '202':
+          description: Inspection accepted
+  /ai-inspections/{id}:
+    get:
+      summary: Get AI inspection
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Inspection detail
+  /alerts/{id}/acknowledge:
+    post:
+      summary: Acknowledge alert
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert acknowledged
