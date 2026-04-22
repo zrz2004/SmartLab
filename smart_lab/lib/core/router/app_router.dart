@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../localization/app_localizations.dart';
 import '../../features/alerts/presentation/pages/alerts_page.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/pages/lab_selection_page.dart';
@@ -97,7 +98,7 @@ class AppRouter {
           children: [
             const Icon(Icons.error_outline, size: 64, color: Colors.red),
             const SizedBox(height: 16),
-            Text('Page not found', style: Theme.of(context).textTheme.titleLarge),
+            Text(context.l10n.t('router.pageNotFound'), style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(state.uri.toString()),
           ],

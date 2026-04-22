@@ -40,6 +40,7 @@ class ApiEndpoints {
   static const String accessibleLabs = '/labs/accessible';
   static const String selectLab = '/labs/select';
   static String labContext(String labId) => '/labs/$labId/context';
+  static String labReminderSettings(String labId) => '/labs/$labId/reminder-settings';
   
   // ==================== 用户管理 ====================
   
@@ -51,6 +52,7 @@ class ApiEndpoints {
 
   static const String mediaUpload = '/media/upload';
   static const String aiInspections = '/ai-inspections';
+  static const String latestAiInspection = '/ai-inspections/latest';
   
   // ==================== 报表 ====================
   

@@ -15,6 +15,7 @@ class Chemical extends Equatable {
   final DateTime expiryDate;
   final String? rfidTag;
   final String? notes;
+  final List<ChemicalResponsibleUser> responsibleUsers;
 
   const Chemical({
     required this.id,
@@ -30,25 +31,30 @@ class Chemical extends Equatable {
     required this.expiryDate,
     this.rfidTag,
     this.notes,
+    this.responsibleUsers = const [],
   });
 
   factory Chemical.fromJson(Map<String, dynamic> json) {
+    final quantityValue = json['quantity'];
     return Chemical(
       id: json['id'].toString(),
-      labId: json['lab_id'] as String? ?? '',
+      labId: json['lab_id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
       casNumber: json['cas_number'] as String? ?? '',
       cabinetId: json['cabinet_id'] as String? ?? '',
       shelfCode: json['shelf_code'] as String? ?? '',
       hazardClass: ChemicalHazardClass.fromString(json['hazard_class'] as String?),
       status: ChemicalStatus.fromString(json['status'] as String?),
-      quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+      quantity: quantityValue is num ? quantityValue.toDouble() : double.tryParse(quantityValue?.toString() ?? '') ?? 0,
       unit: json['unit'] as String? ?? 'bottle',
       expiryDate: json['expiry_date'] != null
           ? DateTime.tryParse(json['expiry_date'] as String) ?? DateTime.now()
           : DateTime.now().add(const Duration(days: 180)),
       rfidTag: json['rfid_tag'] as String?,
       notes: json['notes'] as String?,
+      responsibleUsers: (json['responsible_users'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => ChemicalResponsibleUser.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList(),
     );
   }
 
@@ -66,6 +72,7 @@ class Chemical extends Equatable {
     DateTime? expiryDate,
     String? rfidTag,
     String? notes,
+    List<ChemicalResponsibleUser>? responsibleUsers,
   }) {
     return Chemical(
       id: id ?? this.id,
@@ -81,6 +88,7 @@ class Chemical extends Equatable {
       expiryDate: expiryDate ?? this.expiryDate,
       rfidTag: rfidTag ?? this.rfidTag,
       notes: notes ?? this.notes,
+      responsibleUsers: responsibleUsers ?? this.responsibleUsers,
     );
   }
 
@@ -103,7 +111,81 @@ class Chemical extends Equatable {
         expiryDate,
         rfidTag,
         notes,
+        responsibleUsers,
       ];
+}
+
+class ChemicalResponsibleUser extends Equatable {
+  final String id;
+  final String name;
+  final String role;
+  final String? email;
+  final String? phone;
+  final String? responsibilityType;
+  final String? notes;
+
+  const ChemicalResponsibleUser({
+    required this.id,
+    required this.name,
+    required this.role,
+    this.email,
+    this.phone,
+    this.responsibilityType,
+    this.notes,
+  });
+
+  factory ChemicalResponsibleUser.fromJson(Map<String, dynamic> json) {
+    return ChemicalResponsibleUser(
+      id: json['id'].toString(),
+      name: json['name'] as String? ?? 'Unknown',
+      role: json['role'] as String? ?? 'undergraduate',
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
+      responsibilityType: json['responsibilityType'] as String? ?? json['responsibility_type'] as String?,
+      notes: json['notes'] as String?,
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, name, role, email, phone, responsibilityType, notes];
+}
+
+class LabMember extends Equatable {
+  final String id;
+  final String name;
+  final String username;
+  final String role;
+  final String? department;
+  final String? phone;
+  final String? email;
+  final List<String> accessibleLabIds;
+
+  const LabMember({
+    required this.id,
+    required this.name,
+    required this.username,
+    required this.role,
+    this.department,
+    this.phone,
+    this.email,
+    this.accessibleLabIds = const [],
+  });
+
+  factory LabMember.fromJson(Map<String, dynamic> json) {
+    return LabMember(
+      id: json['id'].toString(),
+      name: json['name'] as String? ?? json['username'] as String? ?? 'Unknown',
+      username: json['username'] as String? ?? '',
+      role: json['role'] as String? ?? 'undergraduate',
+      department: json['department'] as String?,
+      phone: json['phone'] as String?,
+      email: json['email'] as String?,
+      accessibleLabIds: List<String>.from(json['accessible_lab_ids'] ?? const <String>[]),
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, name, username, role, department, phone, email, accessibleLabIds];
 }
 
 enum ChemicalHazardClass {

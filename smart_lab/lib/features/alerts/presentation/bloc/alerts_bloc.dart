@@ -25,10 +25,15 @@ class AlertsBloc extends Bloc<AlertsEvent, AlertsState> {
     on<FilterAlerts>(_onFilterAlerts);
     on<ClearAllAlerts>(_onClearAllAlerts);
 
-    _subscription = mqttService.alertStream.listen((alert) => add(AlertReceived(alert)));
+    _subscription = mqttService.alertStream.listen(
+      (alert) => add(AlertReceived(alert)),
+    );
   }
 
-  Future<void> _onLoadAlerts(LoadAlerts event, Emitter<AlertsState> emit) async {
+  Future<void> _onLoadAlerts(
+    LoadAlerts event,
+    Emitter<AlertsState> emit,
+  ) async {
     emit(state.copyWith(status: AlertsStatus.loading, errorMessage: null));
 
     try {
@@ -49,20 +54,20 @@ class AlertsBloc extends Bloc<AlertsEvent, AlertsState> {
           id: 'alert_001',
           type: AlertType.temperatureHigh,
           level: AlertLevel.warning,
-          title: 'Temperature warning',
-          message: 'Temperature reached 28.5 C.',
+          title: '温度预警',
+          message: '实验室温度达到 28.5°C。',
           deviceId: 'temp_sensor_01',
-          deviceName: 'Temp sensor #1',
+          deviceName: '温度传感器 #1',
           timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
         ),
         Alert(
           id: 'alert_ai_001',
           type: AlertType.windowOpen,
           level: AlertLevel.warning,
-          title: 'AI image warning',
-          message: 'AI review detected an open window that needs manual confirmation.',
+          title: 'AI 图像预警',
+          message: 'AI 复核检测到窗户疑似开启，请人工确认。',
           deviceId: 'camera_ai_01',
-          deviceName: 'AI image inspection',
+          deviceName: 'AI 图像巡检',
           timestamp: DateTime.now().subtract(const Duration(minutes: 8)),
           snapshot: const {
             'source': 'ai',
@@ -75,13 +80,13 @@ class AlertsBloc extends Bloc<AlertsEvent, AlertsState> {
           id: 'alert_002',
           type: AlertType.leakageCurrent,
           level: AlertLevel.critical,
-          title: 'Leakage current critical',
-          message: 'Leakage current reached 32mA.',
+          title: '漏电流严重警告',
+          message: '漏电流达到 32mA。',
           deviceId: 'power_monitor_01',
-          deviceName: 'Power monitor',
+          deviceName: '电源监测器',
           timestamp: DateTime.now().subtract(const Duration(hours: 1)),
           isAcknowledged: true,
-          acknowledgedBy: 'Admin',
+          acknowledgedBy: '值班人员',
           acknowledgedAt: DateTime.now().subtract(const Duration(minutes: 45)),
         ),
       ];
@@ -91,7 +96,7 @@ class AlertsBloc extends Bloc<AlertsEvent, AlertsState> {
           status: AlertsStatus.loaded,
           alerts: alerts,
           filteredAlerts: _applyFilter(alerts, state.selectedLevel),
-          errorMessage: 'Loaded local alerts fallback.',
+          errorMessage: '已加载本地报警兜底数据。',
         ),
       );
     }
@@ -99,31 +104,65 @@ class AlertsBloc extends Bloc<AlertsEvent, AlertsState> {
 
   void _onAlertReceived(AlertReceived event, Emitter<AlertsState> emit) {
     final updatedAlerts = [event.alert, ...state.alerts];
-    emit(state.copyWith(alerts: updatedAlerts, filteredAlerts: _applyFilter(updatedAlerts, state.selectedLevel)));
+    emit(
+      state.copyWith(
+        alerts: updatedAlerts,
+        filteredAlerts: _applyFilter(updatedAlerts, state.selectedLevel),
+      ),
+    );
   }
 
-  Future<void> _onAcknowledgeAlert(AcknowledgeAlert event, Emitter<AlertsState> emit) async {
+  Future<void> _onAcknowledgeAlert(
+    AcknowledgeAlert event,
+    Emitter<AlertsState> emit,
+  ) async {
     try {
       await apiService.acknowledgeAlert(event.alertId);
     } catch (_) {}
 
     final updatedAlerts = state.alerts.map((alert) {
       if (alert.id == event.alertId) {
-        return alert.copyWith(isAcknowledged: true, acknowledgedBy: 'Operator', acknowledgedAt: DateTime.now());
+        return alert.copyWith(
+          isAcknowledged: true,
+          acknowledgedBy: '值班人员',
+          acknowledgedAt: DateTime.now(),
+        );
       }
       return alert;
     }).toList();
 
-    emit(state.copyWith(alerts: updatedAlerts, filteredAlerts: _applyFilter(updatedAlerts, state.selectedLevel)));
+    emit(
+      state.copyWith(
+        alerts: updatedAlerts,
+        filteredAlerts: _applyFilter(updatedAlerts, state.selectedLevel),
+      ),
+    );
   }
 
   void _onFilterAlerts(FilterAlerts event, Emitter<AlertsState> emit) {
-    emit(state.copyWith(selectedLevel: event.level, filteredAlerts: _applyFilter(state.alerts, event.level)));
+    emit(
+      state.copyWith(
+        selectedLevel: event.level,
+        filteredAlerts: _applyFilter(state.alerts, event.level),
+      ),
+    );
   }
 
   void _onClearAllAlerts(ClearAllAlerts event, Emitter<AlertsState> emit) {
-    final updatedAlerts = state.alerts.map((alert) => alert.copyWith(isAcknowledged: true, acknowledgedAt: DateTime.now())).toList();
-    emit(state.copyWith(alerts: updatedAlerts, filteredAlerts: _applyFilter(updatedAlerts, state.selectedLevel)));
+    final updatedAlerts = state.alerts
+        .map(
+          (alert) => alert.copyWith(
+            isAcknowledged: true,
+            acknowledgedAt: DateTime.now(),
+          ),
+        )
+        .toList();
+    emit(
+      state.copyWith(
+        alerts: updatedAlerts,
+        filteredAlerts: _applyFilter(updatedAlerts, state.selectedLevel),
+      ),
+    );
   }
 
   List<Alert> _applyFilter(List<Alert> alerts, AlertLevel? level) {

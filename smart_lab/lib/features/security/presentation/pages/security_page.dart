@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/control_switch.dart';
@@ -35,6 +36,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return BlocBuilder<SecurityBloc, SecurityState>(
       builder: (context, state) {
+        final l10n = context.l10n;
         final authState = context.watch<AuthBloc>().state;
         final currentLabId = authState.currentLabId ?? 'lab_yuanlou_806';
         return Column(
@@ -47,7 +49,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
               ),
               child: TabBar(
                 controller: _tabController,
-                tabs: const [Tab(text: 'Water'), Tab(text: 'Doors')],
+                tabs: [Tab(text: l10n.t('security.tabWater')), Tab(text: l10n.t('security.tabDoors'))],
               ),
             ),
             Expanded(
@@ -58,16 +60,16 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                     children: [
                       EvidenceActionsCard(
-                        title: 'AI evidence for water',
-                        description: 'Review valves, taps and leaks from photos.',
+                        title: l10n.t('security.waterEvidenceTitle'),
+                        description: l10n.t('security.waterEvidenceDesc'),
                         labId: currentLabId,
                         sceneType: 'water',
                         deviceType: 'main_valve',
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       ControlSwitch(
-                        title: 'Main valve',
-                        subtitle: state.mainValveOpen ? 'Open' : 'Closed',
+                        title: l10n.t('security.mainValve'),
+                        subtitle: state.mainValveOpen ? l10n.t('security.open') : l10n.t('security.closed'),
                         isOn: state.mainValveOpen,
                         icon: Icons.water_drop,
                         activeColor: AppColors.water,
@@ -81,8 +83,8 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                     children: [
                       EvidenceActionsCard(
-                        title: 'AI evidence for doors and windows',
-                        description: 'Review lock state and window opening angle from photos.',
+                        title: l10n.t('security.doorsEvidenceTitle'),
+                        description: l10n.t('security.doorsEvidenceDesc'),
                         labId: currentLabId,
                         sceneType: 'security',
                         deviceType: 'door_window',
@@ -93,7 +95,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: ControlSwitch(
                             title: door.name,
-                            subtitle: door.isLocked ? 'Locked' : 'Unlocked',
+                            subtitle: door.isLocked ? l10n.t('security.locked') : l10n.t('security.unlocked'),
                             isOn: door.isLocked,
                             icon: Icons.door_front_door_outlined,
                             activeColor: AppColors.security,
@@ -108,7 +110,9 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                           child: ControlSwitch(
                             title: window.name,
-                            subtitle: window.isOpen ? 'Angle ${window.openAngle}' : 'Closed',
+                            subtitle: window.isOpen
+                                ? l10n.t('security.windowAngle', params: {'angle': '${window.openAngle}'})
+                                : l10n.t('security.closed'),
                             isOn: window.isOpen,
                             icon: Icons.window_outlined,
                             activeColor: AppColors.environment,

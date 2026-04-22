@@ -13,22 +13,32 @@ class DashboardState extends Equatable {
   final DashboardStatus status;
   final String currentLabId;
   final String currentLabName;
+  final String currentLabSubtitle;
   final int safetyScore;
   final List<Alert> alerts;
   final Map<String, SensorData> sensorDataMap;
   final bool isMqttConnected;
   final DateTime? lastUpdateTime;
+  final String environmentStatus;
+  final String powerStatus;
+  final String waterStatus;
+  final String doorStatus;
   final String? errorMessage;
   
   const DashboardState({
     this.status = DashboardStatus.initial,
     this.currentLabId = '',
     this.currentLabName = '',
+    this.currentLabSubtitle = '',
     this.safetyScore = 100,
     this.alerts = const [],
     this.sensorDataMap = const {},
     this.isMqttConnected = false,
     this.lastUpdateTime,
+    this.environmentStatus = 'review',
+    this.powerStatus = 'review',
+    this.waterStatus = 'Normal',
+    this.doorStatus = 'Review',
     this.errorMessage,
   });
   
@@ -92,27 +102,52 @@ class DashboardState extends Equatable {
     );
     return powerData.power;
   }
+
+  double? get latestVoc {
+    final envData = sensorDataMap.values.firstWhere(
+      (d) => d.deviceType == 'environment',
+      orElse: () => SensorData(
+        deviceId: '',
+        deviceType: '',
+        buildingId: '',
+        roomId: '',
+        timestamp: DateTime.now(),
+        values: const {},
+      ),
+    );
+    return envData.vocIndex;
+  }
   
   DashboardState copyWith({
     DashboardStatus? status,
     String? currentLabId,
     String? currentLabName,
+    String? currentLabSubtitle,
     int? safetyScore,
     List<Alert>? alerts,
     Map<String, SensorData>? sensorDataMap,
     bool? isMqttConnected,
     DateTime? lastUpdateTime,
+    String? environmentStatus,
+    String? powerStatus,
+    String? waterStatus,
+    String? doorStatus,
     String? errorMessage,
   }) {
     return DashboardState(
       status: status ?? this.status,
       currentLabId: currentLabId ?? this.currentLabId,
       currentLabName: currentLabName ?? this.currentLabName,
+      currentLabSubtitle: currentLabSubtitle ?? this.currentLabSubtitle,
       safetyScore: safetyScore ?? this.safetyScore,
       alerts: alerts ?? this.alerts,
       sensorDataMap: sensorDataMap ?? this.sensorDataMap,
       isMqttConnected: isMqttConnected ?? this.isMqttConnected,
       lastUpdateTime: lastUpdateTime ?? this.lastUpdateTime,
+      environmentStatus: environmentStatus ?? this.environmentStatus,
+      powerStatus: powerStatus ?? this.powerStatus,
+      waterStatus: waterStatus ?? this.waterStatus,
+      doorStatus: doorStatus ?? this.doorStatus,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
@@ -122,11 +157,16 @@ class DashboardState extends Equatable {
     status,
     currentLabId,
     currentLabName,
+    currentLabSubtitle,
     safetyScore,
     alerts,
     sensorDataMap,
     isMqttConnected,
     lastUpdateTime,
+    environmentStatus,
+    powerStatus,
+    waterStatus,
+    doorStatus,
     errorMessage,
   ];
 }

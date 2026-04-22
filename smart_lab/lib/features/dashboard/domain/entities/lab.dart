@@ -67,17 +67,17 @@ enum LabType {
   String get displayName {
     switch (this) {
       case LabType.chemistry:
-        return 'Chemistry Lab';
+        return '化学实验室';
       case LabType.physics:
-        return 'Physics Lab';
+        return '物理实验室';
       case LabType.biology:
-        return 'Biology Lab';
+        return '生物实验室';
       case LabType.electronics:
-        return 'Electronics Lab';
+        return '电子实验室';
       case LabType.computer:
-        return 'Computer Lab';
+        return '计算机实验室';
       case LabType.general:
-        return 'General Lab';
+        return '综合实验室';
     }
   }
 }
@@ -99,15 +99,15 @@ enum LabStatus {
   String get displayName {
     switch (this) {
       case LabStatus.normal:
-        return 'Normal';
+        return '正常';
       case LabStatus.warning:
-        return 'Warning';
+        return '预警';
       case LabStatus.alert:
-        return 'Alert';
+        return '告警';
       case LabStatus.offline:
-        return 'Offline';
+        return '离线';
       case LabStatus.maintenance:
-        return 'Maintenance';
+        return '维护中';
     }
   }
 }
@@ -177,31 +177,31 @@ enum DeviceType {
   String get displayName {
     switch (this) {
       case DeviceType.environmentSensor:
-        return 'Environment Sensor';
+        return '环境传感器';
       case DeviceType.powerMonitor:
-        return 'Power Monitor';
+        return '电源监测';
       case DeviceType.smartSocket:
-        return 'Smart Socket';
+        return '智能插座';
       case DeviceType.smartBreaker:
-        return 'Smart Breaker';
+        return '智能断路器';
       case DeviceType.waterSensor:
-        return 'Water Sensor';
+        return '水路传感器';
       case DeviceType.flowMeter:
-        return 'Flow Meter';
+        return '流量计';
       case DeviceType.electroValve:
-        return 'Electro Valve';
+        return '电磁阀';
       case DeviceType.doorSensor:
-        return 'Door Sensor';
+        return '门禁传感器';
       case DeviceType.windowSensor:
-        return 'Window Sensor';
+        return '窗户传感器';
       case DeviceType.pirSensor:
-        return 'PIR Sensor';
+        return '人体红外传感器';
       case DeviceType.rfidReader:
-        return 'RFID Reader';
+        return 'RFID 读卡器';
       case DeviceType.camera:
-        return 'Camera';
+        return '摄像头';
       case DeviceType.gateway:
-        return 'Gateway';
+        return '网关';
     }
   }
 }
@@ -222,13 +222,13 @@ enum DeviceStatus {
   String get displayName {
     switch (this) {
       case DeviceStatus.online:
-        return 'Online';
+        return '在线';
       case DeviceStatus.offline:
-        return 'Offline';
+        return '离线';
       case DeviceStatus.warning:
-        return 'Warning';
+        return '预警';
       case DeviceStatus.error:
-        return 'Error';
+        return '故障';
     }
   }
 }

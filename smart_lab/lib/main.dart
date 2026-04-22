@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/di/injection.dart';
+import 'core/localization/app_localizations.dart';
+import 'core/localization/locale_cubit.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/upload_reminder_host.dart';
 import 'features/alerts/presentation/bloc/alerts_bloc.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/chemicals/presentation/bloc/chemicals_bloc.dart';
@@ -43,6 +47,9 @@ class SmartLabApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
+        BlocProvider<LocaleCubit>(
+          create: (_) => getIt<LocaleCubit>()..loadSavedLocale(),
+        ),
         BlocProvider<AuthBloc>(
           create: (_) => getIt<AuthBloc>()..add(const AuthCheckRequested()),
         ),
@@ -55,17 +62,33 @@ class SmartLabApp extends StatelessWidget {
         BlocProvider<ChemicalsBloc>(create: (_) => getIt<ChemicalsBloc>()),
         BlocProvider<AlertsBloc>(create: (_) => getIt<AlertsBloc>()),
       ],
-      child: MaterialApp.router(
-        title: 'SmartLab',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.light,
-        routerConfig: AppRouter.router,
-        builder: (context, child) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
-            child: child ?? const SizedBox.shrink(),
+      child: BlocBuilder<LocaleCubit, Locale>(
+        builder: (context, locale) {
+          return MaterialApp.router(
+            title: 'SmartLab',
+            debugShowCheckedModeBanner: false,
+            locale: locale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: ThemeMode.light,
+            routerConfig: AppRouter.router,
+            builder: (context, child) {
+              return UploadReminderHost(
+                child: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.noScaling,
+                  ),
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              );
+            },
           );
         },
       ),

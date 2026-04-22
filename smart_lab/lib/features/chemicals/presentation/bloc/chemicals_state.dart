@@ -4,9 +4,11 @@ enum ChemicalsStatus { initial, loading, loaded, error }
 
 const Object _selectedHazardClassSentinel = Object();
 const Object _errorMessageSentinel = Object();
+const Object _actionMessageSentinel = Object();
 
 class ChemicalsState extends Equatable {
   final ChemicalsStatus status;
+  final bool isSaving;
   final List<Chemical> chemicals;
   final List<Chemical> filteredChemicals;
   final String searchQuery;
@@ -14,10 +16,15 @@ class ChemicalsState extends Equatable {
   final bool isScanning;
   final Chemical? scannedChemical;
   final List<ChemicalLog> recentLogs;
+  final List<LabMember> labMembers;
+  final List<Map<String, dynamic>> cabinets;
   final String? errorMessage;
+  final String? actionMessage;
+  final String currentLabId;
   
   const ChemicalsState({
     this.status = ChemicalsStatus.initial,
+    this.isSaving = false,
     this.chemicals = const [],
     this.filteredChemicals = const [],
     this.searchQuery = '',
@@ -25,11 +32,16 @@ class ChemicalsState extends Equatable {
     this.isScanning = false,
     this.scannedChemical,
     this.recentLogs = const [],
+    this.labMembers = const [],
+    this.cabinets = const [],
     this.errorMessage,
+    this.actionMessage,
+    this.currentLabId = '',
   });
   
   ChemicalsState copyWith({
     ChemicalsStatus? status,
+    bool? isSaving,
     List<Chemical>? chemicals,
     List<Chemical>? filteredChemicals,
     String? searchQuery,
@@ -37,10 +49,15 @@ class ChemicalsState extends Equatable {
     bool? isScanning,
     Chemical? scannedChemical,
     List<ChemicalLog>? recentLogs,
+    List<LabMember>? labMembers,
+    List<Map<String, dynamic>>? cabinets,
     Object? errorMessage = _errorMessageSentinel,
+    Object? actionMessage = _actionMessageSentinel,
+    String? currentLabId,
   }) {
     return ChemicalsState(
       status: status ?? this.status,
+      isSaving: isSaving ?? this.isSaving,
       chemicals: chemicals ?? this.chemicals,
       filteredChemicals: filteredChemicals ?? this.filteredChemicals,
       searchQuery: searchQuery ?? this.searchQuery,
@@ -50,7 +67,11 @@ class ChemicalsState extends Equatable {
       isScanning: isScanning ?? this.isScanning,
       scannedChemical: scannedChemical ?? this.scannedChemical,
       recentLogs: recentLogs ?? this.recentLogs,
+      labMembers: labMembers ?? this.labMembers,
+      cabinets: cabinets ?? this.cabinets,
       errorMessage: identical(errorMessage, _errorMessageSentinel) ? this.errorMessage : errorMessage as String?,
+      actionMessage: identical(actionMessage, _actionMessageSentinel) ? this.actionMessage : actionMessage as String?,
+      currentLabId: currentLabId ?? this.currentLabId,
     );
   }
   
@@ -72,6 +93,7 @@ class ChemicalsState extends Equatable {
   @override
   List<Object?> get props => [
     status,
+    isSaving,
     chemicals,
     filteredChemicals,
     searchQuery,
@@ -79,5 +101,10 @@ class ChemicalsState extends Equatable {
     isScanning,
     scannedChemical,
     recentLogs,
+    labMembers,
+    cabinets,
+    errorMessage,
+    actionMessage,
+    currentLabId,
   ];
 }

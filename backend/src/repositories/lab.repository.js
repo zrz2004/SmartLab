@@ -2,6 +2,15 @@ import { alerts as memoryAlerts, devices as memoryDevices, labs as memoryLabs } 
 import { hasTable, isDatabaseConfigured, isLegacySchema, query } from '../db.js';
 import { getSupportedLegacyLabIds, mapLegacyLabRow, toDatabaseLabId, toExternalLabId } from '../utils/lab-mapper.js';
 
+function normalizeReminderTime(value, fallback) {
+  const raw = String(value ?? fallback ?? '').trim();
+  const match = raw.match(/^(\d{2}):(\d{2})/);
+  if (!match) {
+    return fallback;
+  }
+  return `${match[1]}:${match[2]}`;
+}
+
 class LabRepository {
   async getAllLabs() {
     if (!isDatabaseConfigured()) return memoryLabs;
@@ -96,11 +105,12 @@ class LabRepository {
       );
       if (labResult.rowCount === 0) return null;
       const lab = labResult.rows[0];
+      const mappedLab = mapLegacyLabRow(lab);
       const deviceResult = await query('select distinct type from sensors where lab_id = $1 order by type', [databaseLabId]);
       return {
-        labId: toExternalLabId(lab.id),
-        name: lab.name,
-        mqttTopicPrefix: `lab/${lab.building_id}/${lab.room_number}`,
+        labId: mappedLab.id,
+        name: mappedLab.name,
+        mqttTopicPrefix: `lab/${lab.building_id}/${mappedLab.room_number}`,
         aiInspectionEnabled: true,
         availableDeviceTypes: deviceResult.rows.map((row) => row.type)
       };
@@ -179,6 +189,191 @@ class LabRepository {
       labId,
       score: Math.max(0, 100 - Number(row.deduction ?? 0)),
       alertCount: Number(row.alert_count ?? 0)
+    };
+  }
+
+  async getReminderSettings(labId) {
+    if (!isDatabaseConfigured()) {
+      return {
+        labId,
+        enabled: true,
+        firstReminderTime: '19:00',
+        secondReminderTime: '23:00',
+        updatedAt: null,
+        updatedBy: null
+      };
+    }
+
+    if (!(await hasTable('lab_upload_reminder_settings'))) {
+      return {
+        labId,
+        enabled: true,
+        firstReminderTime: '19:00',
+        secondReminderTime: '23:00',
+        updatedAt: null,
+        updatedBy: null
+      };
+    }
+
+    if (await isLegacySchema()) {
+      const databaseLabId = toDatabaseLabId(labId);
+      const result = await query(
+        `
+        select
+          l.id as lab_id,
+          s.enabled,
+          s.first_reminder_time::text as first_reminder_time,
+          s.second_reminder_time::text as second_reminder_time,
+          s.updated_at,
+          s.updated_by
+        from labs l
+        left join lab_upload_reminder_settings s on s.lab_id = l.id
+        where l.id = $1
+        limit 1
+        `,
+        [databaseLabId]
+      );
+      if (result.rowCount === 0) {
+        return null;
+      }
+      const row = result.rows[0];
+      return {
+        labId: toExternalLabId(row.lab_id),
+        enabled: row.enabled ?? true,
+        firstReminderTime: normalizeReminderTime(row.first_reminder_time, '19:00'),
+        secondReminderTime: normalizeReminderTime(row.second_reminder_time, '23:00'),
+        updatedAt: row.updated_at ?? null,
+        updatedBy: row.updated_by != null ? String(row.updated_by) : null
+      };
+    }
+
+    const result = await query(
+      `
+      select
+        l.id as lab_id,
+        s.enabled,
+        s.first_reminder_time::text as first_reminder_time,
+        s.second_reminder_time::text as second_reminder_time,
+        s.updated_at,
+        s.updated_by
+      from labs l
+      left join lab_upload_reminder_settings s on s.lab_id = l.id
+      where l.id = $1
+      limit 1
+      `,
+      [labId]
+    );
+    if (result.rowCount === 0) {
+      return null;
+    }
+    const row = result.rows[0];
+    return {
+      labId: row.lab_id,
+      enabled: row.enabled ?? true,
+      firstReminderTime: normalizeReminderTime(row.first_reminder_time, '19:00'),
+      secondReminderTime: normalizeReminderTime(row.second_reminder_time, '23:00'),
+      updatedAt: row.updated_at ?? null,
+      updatedBy: row.updated_by != null ? String(row.updated_by) : null
+    };
+  }
+
+  async upsertReminderSettings({
+    labId,
+    enabled,
+    firstReminderTime,
+    secondReminderTime,
+    updatedBy
+  }) {
+    if (!isDatabaseConfigured()) {
+      return {
+        labId,
+        enabled,
+        firstReminderTime,
+        secondReminderTime,
+        updatedAt: new Date().toISOString(),
+        updatedBy: updatedBy != null ? String(updatedBy) : null
+      };
+    }
+
+    if (!(await hasTable('lab_upload_reminder_settings'))) {
+      throw new Error('lab_upload_reminder_settings table is missing.');
+    }
+
+    if (await isLegacySchema()) {
+      const databaseLabId = toDatabaseLabId(labId);
+      const result = await query(
+        `
+        insert into lab_upload_reminder_settings (
+          lab_id,
+          enabled,
+          first_reminder_time,
+          second_reminder_time,
+          updated_by,
+          updated_at
+        )
+        values ($1, $2, $3::time, $4::time, $5, now())
+        on conflict (lab_id) do update
+        set enabled = excluded.enabled,
+            first_reminder_time = excluded.first_reminder_time,
+            second_reminder_time = excluded.second_reminder_time,
+            updated_by = excluded.updated_by,
+            updated_at = now()
+        returning
+          lab_id,
+          enabled,
+          first_reminder_time::text as first_reminder_time,
+          second_reminder_time::text as second_reminder_time,
+          updated_at,
+          updated_by
+        `,
+        [databaseLabId, enabled, firstReminderTime, secondReminderTime, updatedBy]
+      );
+      const row = result.rows[0];
+      return {
+        labId: toExternalLabId(row.lab_id),
+        enabled: row.enabled,
+        firstReminderTime: normalizeReminderTime(row.first_reminder_time, firstReminderTime),
+        secondReminderTime: normalizeReminderTime(row.second_reminder_time, secondReminderTime),
+        updatedAt: row.updated_at ?? null,
+        updatedBy: row.updated_by != null ? String(row.updated_by) : null
+      };
+    }
+
+    const result = await query(
+      `
+      insert into lab_upload_reminder_settings (
+        lab_id,
+        enabled,
+        first_reminder_time,
+        second_reminder_time,
+        updated_by,
+        updated_at
+      )
+      values ($1, $2, $3::time, $4::time, $5, now())
+      on conflict (lab_id) do update
+      set enabled = excluded.enabled,
+          first_reminder_time = excluded.first_reminder_time,
+          second_reminder_time = excluded.second_reminder_time,
+          updated_by = excluded.updated_by,
+          updated_at = now()
+      returning
+        lab_id,
+        enabled,
+        first_reminder_time::text as first_reminder_time,
+        second_reminder_time::text as second_reminder_time,
+        updated_at,
+        updated_by
+      `,
+      [labId, enabled, firstReminderTime, secondReminderTime, updatedBy]
+    );
+    const row = result.rows[0];
+    return {
+      labId: row.lab_id,
+      enabled: row.enabled,
+      firstReminderTime: normalizeReminderTime(row.first_reminder_time, firstReminderTime),
+      secondReminderTime: normalizeReminderTime(row.second_reminder_time, secondReminderTime),
+      updatedAt: row.updated_at ?? null,
+      updatedBy: row.updated_by != null ? String(row.updated_by) : null
     };
   }
 }

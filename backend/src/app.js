@@ -12,6 +12,7 @@ import labsRoutes from './routes/labs.routes.js';
 import mediaRoutes from './routes/media.routes.js';
 import permissionsRoutes from './routes/permissions.routes.js';
 import telemetryRoutes from './routes/telemetry.routes.js';
+import usersRoutes from './routes/users.routes.js';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use(`${config.apiPrefix}/auth`, authRoutes);
+app.use(`${config.apiPrefix}/users`, usersRoutes);
 app.use(`${config.apiPrefix}/permissions`, permissionsRoutes);
 app.use(`${config.apiPrefix}/labs`, labsRoutes);
 app.use(`${config.apiPrefix}/devices`, devicesRoutes);

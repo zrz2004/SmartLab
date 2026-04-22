@@ -7,7 +7,7 @@ import {
   sanitizeUser as sanitizeMemoryUser,
   users as memoryUsers
 } from '../data/store.js';
-import { hasTable, isDatabaseConfigured, isLegacySchema, query } from '../db.js';
+import { hasColumn, hasTable, isDatabaseConfigured, isLegacySchema, query } from '../db.js';
 import { getSupportedLegacyLabIds, toDatabaseLabId, toExternalLabId } from '../utils/lab-mapper.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
 
@@ -16,24 +16,88 @@ function buildLegacyDisplayName(user) {
 }
 
 class UserRepository {
+  async _resolveLegacyUserId(value) {
+    if (value == null) {
+      return null;
+    }
+
+    const normalized = String(value).trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const numericId = Number(normalized);
+    if (Number.isInteger(numericId)) {
+      return numericId;
+    }
+
+    const aliasRoleMap = new Map([
+      ['staff_admin', 'admin'],
+      ['staff_teacher', 'teacher'],
+      ['staff_manager', 'admin']
+    ]);
+    const aliasUsernameMap = new Map([
+      ['staff_admin', 'admin'],
+      ['staff_teacher', 'teacher'],
+      ['staff_manager', 'admin']
+    ]);
+    const requestedRole = aliasRoleMap.get(normalized);
+    if (requestedRole) {
+      const hasProfileTable = await hasTable('user_profiles');
+      const hasNameColumn = await hasColumn('users', 'name');
+      const hasRoleColumn = await hasColumn('users', 'role');
+      const result = await query(
+        `
+        select u.id
+        from users u
+        ${hasProfileTable ? 'left join user_profiles up on up.user_id = u.id' : ''}
+        where ${hasRoleColumn ? "coalesce(u.role, 'undergraduate')" : "'undergraduate'"} = $1
+        order by ${hasProfileTable ? 'coalesce(up.name, ' : ''}${hasNameColumn ? 'u.name, ' : ''}u.username${hasProfileTable ? ')' : ''}
+        limit 1
+        `,
+        [requestedRole]
+      );
+      if (result.rowCount > 0) {
+        return Number(result.rows[0].id);
+      }
+    }
+
+    const requestedUsername = aliasUsernameMap.get(normalized) ?? normalized;
+    const byUsername = await query(
+      'select id from users where username = $1 limit 1',
+      [requestedUsername]
+    );
+    if (byUsername.rowCount > 0) {
+      return Number(byUsername.rows[0].id);
+    }
+
+    return null;
+  }
+
   async findById(id) {
     if (!isDatabaseConfigured()) {
       return memoryUsers.find((item) => String(item.id) === String(id)) ?? null;
     }
 
     if (await isLegacySchema()) {
-      const result = await query('select * from users where id = $1 limit 1', [id]);
+      const normalizedId = await this._resolveLegacyUserId(id);
+      if (normalizedId == null) {
+        return null;
+      }
+
+      const result = await query('select * from users where id = $1 limit 1', [normalizedId]);
       if (result.rowCount === 0) return null;
 
       const user = result.rows[0];
+      const profile = await this._getLegacyUserProfile(user.id);
       const accessibleLabIds = await this._getLegacyAccessibleLabIds(user);
       return {
         id: user.id,
         username: user.username,
-        name: buildLegacyDisplayName(user),
+        name: profile?.name ?? buildLegacyDisplayName(user),
         role: user.role ?? 'undergraduate',
-        department: user.department ?? 'SmartLab',
-        phone: user.phone ?? null,
+        department: profile?.department ?? 'SmartLab',
+        phone: profile?.phone ?? null,
         email: user.email ?? null,
         avatarUrl: null,
         accessibleLabIds,
@@ -95,15 +159,16 @@ class UserRepository {
       if (result.rowCount === 0) return null;
 
       const user = result.rows[0];
+      const profile = await this._getLegacyUserProfile(user.id);
       const accessibleLabIds = await this._getLegacyAccessibleLabIds(user);
       return {
         id: user.id,
         username: user.username,
         password_hash: user.password_hash,
-        name: buildLegacyDisplayName(user),
+        name: profile?.name ?? buildLegacyDisplayName(user),
         role: user.role ?? 'undergraduate',
-        department: user.department ?? 'SmartLab',
-        phone: user.phone ?? null,
+        department: profile?.department ?? 'SmartLab',
+        phone: profile?.phone ?? null,
         email: user.email ?? null,
         avatarUrl: null,
         accessibleLabIds,
@@ -459,6 +524,224 @@ class UserRepository {
       [requestId, 'rejected', reason]
     );
     return result.rowCount > 0;
+  }
+
+  async listLabMembers({ requester, labId }) {
+    if (!isDatabaseConfigured()) {
+      return memoryUsers
+          .filter((user) => requester.role === 'admin' || user.accessibleLabIds?.some((id) => id === labId))
+          .map((user) => this.sanitizeUser(user));
+    }
+
+    if (await isLegacySchema()) {
+      const hasNameColumn = await hasColumn('users', 'name');
+      const hasRoleColumn = await hasColumn('users', 'role');
+      const hasProfileTable = await hasTable('user_profiles');
+      const hasEmailColumn = await hasColumn('users', 'email');
+      const hasActiveColumn = await hasColumn('users', 'is_active');
+      const hasLastLoginColumn = await hasColumn('users', 'last_login_at');
+      const supportedLabIds = getSupportedLegacyLabIds();
+      const selectedLabId = labId ? toDatabaseLabId(labId) : null;
+      const accessibleLabIds = requester.role === 'admin'
+          ? supportedLabIds
+          : (await this._getLegacyAccessibleLabIds(requester)).map((id) => toDatabaseLabId(id)).filter(Boolean);
+
+      if (accessibleLabIds.length === 0) {
+        return [];
+      }
+
+      const result = await query(
+        `
+        select
+          u.id,
+          u.username,
+          ${hasProfileTable
+              ? `coalesce(up.name, ${hasNameColumn ? 'u.name, ' : ''}u.username)`
+              : (hasNameColumn ? 'coalesce(u.name, u.username)' : 'u.username')} as name,
+          ${hasRoleColumn ? "coalesce(u.role, 'undergraduate')" : "'undergraduate'"} as role,
+          ${hasProfileTable ? 'up.department' : 'null'} as department,
+          ${hasProfileTable ? 'up.phone' : 'null'} as phone,
+          ${hasEmailColumn ? 'u.email' : 'null'} as email,
+          ${hasActiveColumn ? 'u.is_active' : 'true'} as is_active,
+          ${hasLastLoginColumn ? 'u.last_login_at' : 'null'} as last_login_at,
+          array_remove(array_agg(distinct ula.lab_id), null) as assigned_lab_ids
+        from users u
+        ${hasProfileTable ? 'left join user_profiles up on up.user_id = u.id' : ''}
+        left join user_lab_access ula on ula.user_id = u.id
+        where ($1::int is null or ula.lab_id = $1)
+          and (
+            $2::boolean = true
+            or exists (
+              select 1
+              from user_lab_access own
+              where own.user_id = u.id
+                and own.lab_id = any($3::int[])
+            )
+          )
+        group by
+          u.id,
+          u.username,
+          ${hasNameColumn ? 'u.name,' : ''}
+          ${hasRoleColumn ? 'u.role,' : ''}
+          ${hasProfileTable ? 'up.name, up.department, up.phone,' : ''}
+          ${hasEmailColumn ? 'u.email,' : ''}
+          ${hasActiveColumn ? 'u.is_active,' : ''}
+          ${hasLastLoginColumn ? 'u.last_login_at' : 'u.id'}
+        order by
+          case ${hasRoleColumn ? "coalesce(u.role, 'undergraduate')" : "'undergraduate'"}
+            when 'admin' then 1
+            when 'teacher' then 2
+            when 'graduate' then 3
+            else 4
+          end,
+          ${hasNameColumn ? 'coalesce(u.name, u.username)' : 'u.username'}
+        `,
+        [selectedLabId, requester.role === 'admin', accessibleLabIds]
+      );
+
+      return result.rows.map((row) => ({
+        id: String(row.id),
+        username: row.username,
+        name: row.name,
+        role: row.role,
+        department: row.department,
+        phone: row.phone,
+        email: row.email,
+        accessible_lab_ids: (row.assigned_lab_ids ?? []).map((id) => toExternalLabId(id)),
+        last_login_at: row.last_login_at,
+        is_active: row.is_active
+      }));
+    }
+
+    const result = await query(
+      `
+      select distinct
+        u.id,
+        u.username,
+        u.name,
+        u.department,
+        u.phone,
+        u.email,
+        u.avatar_url,
+        u.last_login_at,
+        u.is_active,
+        coalesce(r.code, u.role, 'undergraduate') as role,
+        array_remove(array_agg(distinct ula.lab_id), null) as assigned_lab_ids
+      from users u
+      left join user_role_assignments ura on ura.user_id = u.id
+      left join roles r on r.id = ura.role_id
+      left join user_lab_access ula on ula.user_id = u.id
+      where ($1::text is null or ula.lab_id = $1)
+      group by u.id, u.username, u.name, u.department, u.phone, u.email, u.avatar_url, u.last_login_at, u.is_active, r.code, u.role
+      order by u.name
+      `,
+      [labId ?? null]
+    );
+    return result.rows.map((row) => ({
+      id: String(row.id),
+      username: row.username,
+      name: row.name,
+      role: row.role,
+      department: row.department,
+      phone: row.phone,
+      email: row.email,
+      avatar_url: row.avatar_url,
+      accessible_lab_ids: row.assigned_lab_ids ?? [],
+      last_login_at: row.last_login_at,
+      is_active: row.is_active
+    }));
+  }
+
+  async updateUserProfile({ requester, userId, payload }) {
+    if (!isDatabaseConfigured()) {
+      const target = memoryUsers.find((item) => String(item.id) === String(userId));
+      if (!target) return null;
+      target.name = payload.name ?? target.name;
+      target.phone = payload.phone ?? target.phone;
+      target.email = payload.email ?? target.email;
+      target.department = payload.department ?? target.department;
+      if (requester?.role === 'admin' && payload.role) {
+        target.role = payload.role;
+      }
+      return this.sanitizeUser(target);
+    }
+
+    const legacySchema = await isLegacySchema();
+    const normalizedUserId = legacySchema ? await this._resolveLegacyUserId(userId) : userId;
+    if (normalizedUserId == null) {
+      return null;
+    }
+
+    const currentUser = await this.findById(normalizedUserId);
+    if (!currentUser) {
+      return null;
+    }
+
+    if (legacySchema && (await hasTable('user_profiles'))) {
+      const existingProfile = await this._getLegacyUserProfile(normalizedUserId);
+      const nextName = payload.name ?? existingProfile?.name ?? currentUser.name;
+      const nextPhone = payload.phone ?? existingProfile?.phone ?? currentUser.phone ?? null;
+      const nextDepartment = payload.department ?? existingProfile?.department ?? currentUser.department ?? null;
+
+      if (payload.name !== undefined || payload.phone !== undefined || payload.department !== undefined) {
+        await query(
+          `
+          insert into user_profiles (user_id, name, phone, department, updated_at)
+          values ($1, $2, $3, $4, now())
+          on conflict (user_id) do update
+          set name = excluded.name,
+              phone = excluded.phone,
+              department = excluded.department,
+              updated_at = now()
+          `,
+          [Number(normalizedUserId), nextName, nextPhone, nextDepartment]
+        );
+      }
+    }
+
+    const hasNameColumn = await hasColumn('users', 'name');
+    const hasEmailColumn = await hasColumn('users', 'email');
+    const hasRoleColumn = await hasColumn('users', 'role');
+    const updates = [];
+    const values = [];
+    let index = 2;
+
+    if (payload.name !== undefined && hasNameColumn) {
+      updates.push(`name = $${index++}`);
+      values.push(payload.name);
+    }
+    if (payload.email !== undefined && hasEmailColumn) {
+      updates.push(`email = $${index++}`);
+      values.push(payload.email);
+    }
+    if (requester?.role === 'admin' && payload.role !== undefined && hasRoleColumn) {
+      updates.push(`role = $${index++}`);
+      values.push(payload.role);
+    }
+
+    if (updates.length === 0) {
+      return this.findById(normalizedUserId);
+    }
+
+    const result = await query(
+      `update users set ${updates.join(', ')} where id = $1 returning id`,
+      [normalizedUserId, ...values]
+    );
+    if (result.rowCount === 0) {
+      return null;
+    }
+    return this.sanitizeUser(await this.findById(normalizedUserId));
+  }
+
+  async _getLegacyUserProfile(userId) {
+    if (!(await hasTable('user_profiles'))) {
+      return null;
+    }
+    const result = await query(
+      'select user_id, name, phone, department from user_profiles where user_id = $1 limit 1',
+      [Number(userId)]
+    );
+    return result.rows[0] ?? null;
   }
 
   async _getLegacyAccessibleLabIds(user) {

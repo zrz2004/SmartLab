@@ -10,7 +10,8 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit ?? 50);
   const acknowledged = req.query.acknowledged === undefined ? undefined : String(req.query.acknowledged) === 'true';
   const level = req.query.level;
-  const result = await alertRepository.list({ level, acknowledged, limit });
+  const labId = req.query.labId ? String(req.query.labId) : undefined;
+  const result = await alertRepository.list({ level, acknowledged, labId, limit });
   res.json(result);
 }));
 

@@ -21,45 +21,76 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
     on<ScanRfidTag>(_onScanRfidTag);
     on<CheckInChemical>(_onCheckInChemical);
     on<CheckOutChemical>(_onCheckOutChemical);
+    on<SaveChemical>(_onSaveChemical);
+    on<DeleteChemical>(_onDeleteChemical);
+    on<UpdateLabMemberProfile>(_onUpdateLabMemberProfile);
   }
 
   Future<void> _onLoadChemicals(
     LoadChemicals event,
     Emitter<ChemicalsState> emit,
   ) async {
-    emit(state.copyWith(status: ChemicalsStatus.loading, errorMessage: null));
+    emit(state.copyWith(status: ChemicalsStatus.loading, errorMessage: null, actionMessage: null));
 
+    final labId = _resolveCurrentLabId(event.labId);
+
+    List<Chemical> chemicals;
     try {
-      final labId = MockDataProvider.currentLabId;
       final inventory = await apiService.getChemicalInventory();
-      final filteredInventory = inventory
-          .map(Chemical.fromJson)
-          .where((chemical) => chemical.labId.isEmpty || chemical.labId == labId)
-          .toList();
+      chemicals = <Chemical>[];
 
-      final logs = await apiService.getChemicalLogs(limit: 20);
-      final recentLogs = logs.map(ChemicalLog.fromJson).toList();
+      for (final item in inventory) {
+        final chemical = Chemical.fromJson(item);
+        if (chemical.labId.isNotEmpty && chemical.labId != labId) {
+          continue;
+        }
 
-      emit(
-        _buildState(
-          state,
-          chemicals: filteredInventory,
-          recentLogs: recentLogs,
-          status: ChemicalsStatus.loaded,
-        ),
-      );
+        try {
+          final responsibilities = await apiService.getChemicalResponsibilities(chemical.id);
+          chemicals.add(
+            chemical.copyWith(
+              responsibleUsers: responsibilities
+                  .map(ChemicalResponsibleUser.fromJson)
+                  .toList(),
+            ),
+          );
+        } catch (_) {
+          chemicals.add(chemical);
+        }
+      }
     } catch (_) {
-      final mockChemicals = _buildMockChemicals(MockDataProvider.currentLabId);
-      final mockLogs = _buildMockLogs(mockChemicals);
-      emit(
-        _buildState(
-          state,
-          chemicals: mockChemicals,
-          recentLogs: mockLogs,
-          status: ChemicalsStatus.loaded,
-        ),
-      );
+      chemicals = _buildMockChemicals(labId);
     }
+
+    List<LabMember> labMembers;
+    try {
+      labMembers = (await apiService.getLabUsers(labId: labId))
+          .map(LabMember.fromJson)
+          .toList();
+    } catch (_) {
+      labMembers = _buildMockMembers(labId);
+    }
+
+    List<ChemicalLog> recentLogs;
+    try {
+      recentLogs = (await apiService.getChemicalLogs(limit: 20))
+          .map(ChemicalLog.fromJson)
+          .toList();
+    } catch (_) {
+      recentLogs = _buildMockLogs(chemicals);
+    }
+
+    emit(
+      _buildState(
+        state,
+        chemicals: chemicals,
+        recentLogs: recentLogs,
+        labMembers: labMembers,
+        cabinets: _buildCabinetSummaries(chemicals),
+        status: ChemicalsStatus.loaded,
+        currentLabId: labId,
+      ),
+    );
   }
 
   void _onSearchChemicals(
@@ -68,10 +99,13 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
   ) {
     emit(
       _buildState(
-        state.copyWith(searchQuery: event.query),
+      state.copyWith(searchQuery: event.query),
         chemicals: state.chemicals,
         recentLogs: state.recentLogs,
+        labMembers: state.labMembers,
+        cabinets: state.cabinets,
         status: state.status == ChemicalsStatus.initial ? ChemicalsStatus.loaded : state.status,
+        currentLabId: _resolveCurrentLabId(null),
       ),
     );
   }
@@ -82,10 +116,13 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
   ) {
     emit(
       _buildState(
-        state.copyWith(selectedHazardClass: event.hazardClass),
+      state.copyWith(selectedHazardClass: event.hazardClass),
         chemicals: state.chemicals,
         recentLogs: state.recentLogs,
+        labMembers: state.labMembers,
+        cabinets: state.cabinets,
         status: state.status == ChemicalsStatus.initial ? ChemicalsStatus.loaded : state.status,
+        currentLabId: _resolveCurrentLabId(null),
       ),
     );
   }
@@ -112,10 +149,40 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
     );
   }
 
-  void _onCheckInChemical(
+  Future<void> _onCheckInChemical(
     CheckInChemical event,
     Emitter<ChemicalsState> emit,
-  ) {
+  ) async {
+    try {
+      final response = await apiService.checkInChemical(
+        chemicalId: event.chemicalId,
+        quantity: event.quantity,
+        notes: event.notes,
+      );
+      final updatedChemical = Chemical.fromJson(
+        Map<String, dynamic>.from(response['chemical'] as Map),
+      );
+      final updatedLog = ChemicalLog.fromJson(
+        Map<String, dynamic>.from(response['log'] as Map),
+      );
+      final updatedChemicals = state.chemicals.map((chemical) {
+        if (chemical.id != event.chemicalId) return chemical;
+        return updatedChemical;
+      }).toList();
+      emit(
+        _buildState(
+          state.copyWith(actionMessage: '试剂已入库'),
+          chemicals: updatedChemicals,
+          recentLogs: [updatedLog, ...state.recentLogs],
+          labMembers: state.labMembers,
+          cabinets: _buildCabinetSummaries(updatedChemicals),
+          status: ChemicalsStatus.loaded,
+          currentLabId: _resolveCurrentLabId(null),
+        ),
+      );
+      return;
+    } catch (_) {}
+
     final updatedChemicals = state.chemicals.map((chemical) {
       if (chemical.id != event.chemicalId) return chemical;
       return chemical.copyWith(
@@ -139,18 +206,51 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
 
     emit(
       _buildState(
-        state,
+        state.copyWith(actionMessage: '试剂已入库'),
         chemicals: updatedChemicals,
         recentLogs: updatedLogs,
+        labMembers: state.labMembers,
+        cabinets: _buildCabinetSummaries(updatedChemicals),
         status: ChemicalsStatus.loaded,
+        currentLabId: _resolveCurrentLabId(null),
       ),
     );
   }
 
-  void _onCheckOutChemical(
+  Future<void> _onCheckOutChemical(
     CheckOutChemical event,
     Emitter<ChemicalsState> emit,
-  ) {
+  ) async {
+    try {
+      final response = await apiService.checkOutChemical(
+        chemicalId: event.chemicalId,
+        quantity: event.quantity,
+        notes: event.notes,
+      );
+      final updatedChemical = Chemical.fromJson(
+        Map<String, dynamic>.from(response['chemical'] as Map),
+      );
+      final updatedLog = ChemicalLog.fromJson(
+        Map<String, dynamic>.from(response['log'] as Map),
+      );
+      final updatedChemicals = state.chemicals.map((chemical) {
+        if (chemical.id != event.chemicalId) return chemical;
+        return updatedChemical;
+      }).toList();
+      emit(
+        _buildState(
+          state.copyWith(actionMessage: '试剂已出库'),
+          chemicals: updatedChemicals,
+          recentLogs: [updatedLog, ...state.recentLogs],
+          labMembers: state.labMembers,
+          cabinets: _buildCabinetSummaries(updatedChemicals),
+          status: ChemicalsStatus.loaded,
+          currentLabId: _resolveCurrentLabId(null),
+        ),
+      );
+      return;
+    } catch (_) {}
+
     final updatedChemicals = state.chemicals.map((chemical) {
       if (chemical.id != event.chemicalId) return chemical;
       final nextQuantity = chemical.quantity - event.quantity;
@@ -175,19 +275,155 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
 
     emit(
       _buildState(
-        state,
+        state.copyWith(actionMessage: '试剂已出库'),
         chemicals: updatedChemicals,
         recentLogs: updatedLogs,
+        labMembers: state.labMembers,
+        cabinets: _buildCabinetSummaries(updatedChemicals),
         status: ChemicalsStatus.loaded,
+        currentLabId: _resolveCurrentLabId(null),
       ),
     );
+  }
+
+  Future<void> _onSaveChemical(
+    SaveChemical event,
+    Emitter<ChemicalsState> emit,
+  ) async {
+    emit(state.copyWith(isSaving: true, errorMessage: null, actionMessage: null));
+    try {
+      final labId = _resolveLabIdFromPayload(event.payload);
+      final response = event.chemicalId == null
+          ? await apiService.createChemical(payload: event.payload)
+          : await apiService.updateChemical(
+              chemicalId: event.chemicalId!,
+              payload: event.payload,
+            );
+      final savedChemical = Chemical.fromJson(response);
+      final nextChemicals = _upsertChemical(state.chemicals, savedChemical, labId);
+      emit(
+        _buildState(
+          state.copyWith(
+            isSaving: false,
+            actionMessage: event.chemicalId == null ? '试剂已新增' : '试剂已更新',
+          ),
+          chemicals: nextChemicals,
+          recentLogs: state.recentLogs,
+          labMembers: state.labMembers,
+          cabinets: _buildCabinetSummaries(nextChemicals),
+          status: ChemicalsStatus.loaded,
+          currentLabId: labId,
+        ),
+      );
+
+      add(LoadChemicals(labId: labId));
+    } catch (error) {
+      emit(
+        state.copyWith(
+          isSaving: false,
+          errorMessage: error.toString(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onDeleteChemical(
+    DeleteChemical event,
+    Emitter<ChemicalsState> emit,
+  ) async {
+    emit(state.copyWith(isSaving: true, errorMessage: null, actionMessage: null));
+    try {
+      await apiService.deleteChemical(event.chemicalId);
+      final nextChemicals = state.chemicals
+          .where((chemical) => chemical.id != event.chemicalId)
+          .toList();
+      emit(
+        _buildState(
+          state.copyWith(isSaving: false, actionMessage: '试剂已删除'),
+          chemicals: nextChemicals,
+          recentLogs: state.recentLogs,
+          labMembers: state.labMembers,
+          cabinets: _buildCabinetSummaries(nextChemicals),
+          status: ChemicalsStatus.loaded,
+          currentLabId: _resolveCurrentLabId(null),
+        ),
+      );
+      add(LoadChemicals(labId: _resolveCurrentLabId(null)));
+    } catch (error) {
+      emit(
+        state.copyWith(
+          isSaving: false,
+          errorMessage: error.toString(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onUpdateLabMemberProfile(
+    UpdateLabMemberProfile event,
+    Emitter<ChemicalsState> emit,
+  ) async {
+    emit(state.copyWith(isSaving: true, errorMessage: null, actionMessage: null));
+    try {
+      final response = await apiService.updateLabUser(
+        userId: event.userId,
+        payload: event.payload,
+      );
+      final updatedMember = LabMember.fromJson(response);
+      final nextMembers = state.labMembers
+          .map((member) => member.id == updatedMember.id ? updatedMember : member)
+          .toList();
+      final nextChemicals = state.chemicals
+          .map(
+            (chemical) => chemical.copyWith(
+              responsibleUsers: chemical.responsibleUsers
+                  .map(
+                    (user) => user.id == updatedMember.id
+                        ? ChemicalResponsibleUser(
+                            id: user.id,
+                            name: updatedMember.name,
+                            role: updatedMember.role,
+                            email: updatedMember.email,
+                            phone: updatedMember.phone,
+                            responsibilityType: user.responsibilityType,
+                            notes: user.notes,
+                          )
+                        : user,
+                  )
+                  .toList(),
+            ),
+          )
+          .toList();
+      emit(
+        _buildState(
+          state.copyWith(isSaving: false, actionMessage: '联系人已更新'),
+          chemicals: nextChemicals,
+          recentLogs: state.recentLogs,
+          labMembers: nextMembers,
+          cabinets: _buildCabinetSummaries(nextChemicals),
+          status: ChemicalsStatus.loaded,
+          currentLabId: _resolveCurrentLabId(null),
+        ),
+      );
+      add(LoadChemicals(labId: _resolveCurrentLabId(null)));
+    } catch (error) {
+      emit(
+        state.copyWith(
+          isSaving: false,
+          errorMessage: error.toString(),
+        ),
+      );
+    }
   }
 
   ChemicalsState _buildState(
     ChemicalsState baseState, {
     required List<Chemical> chemicals,
     required List<ChemicalLog> recentLogs,
+    required List<LabMember> labMembers,
+    required List<Map<String, dynamic>> cabinets,
     required ChemicalsStatus status,
+    required String currentLabId,
   }) {
     final query = baseState.searchQuery.trim().toLowerCase();
     final selectedHazardClass = baseState.selectedHazardClass;
@@ -206,8 +442,42 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
       chemicals: chemicals,
       filteredChemicals: filtered,
       recentLogs: recentLogs,
+      labMembers: labMembers,
+      cabinets: cabinets,
       errorMessage: null,
+      actionMessage: baseState.actionMessage,
+      currentLabId: currentLabId,
     );
+  }
+
+  String _resolveLabIdFromPayload(Map<String, dynamic> payload) {
+    final payloadLabId = payload['lab_id'];
+    if (payloadLabId is String && payloadLabId.isNotEmpty) {
+      return payloadLabId;
+    }
+    return _resolveCurrentLabId(null);
+  }
+
+  String _resolveCurrentLabId(String? preferredLabId) {
+    if (preferredLabId != null && preferredLabId.isNotEmpty) {
+      return preferredLabId;
+    }
+    if (state.currentLabId.isNotEmpty) {
+      return state.currentLabId;
+    }
+    return MockDataProvider.currentLabId;
+  }
+
+  List<Chemical> _upsertChemical(
+    List<Chemical> source,
+    Chemical savedChemical,
+    String targetLabId,
+  ) {
+    final retained = source.where((chemical) => chemical.id != savedChemical.id).toList();
+    if (savedChemical.labId.isNotEmpty && savedChemical.labId != targetLabId) {
+      return retained;
+    }
+    return [savedChemical, ...retained];
   }
 
   List<Chemical> _buildMockChemicals(String labId) {
@@ -229,6 +499,15 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
           expiryDate: DateTime.now().add(const Duration(days: 180)),
           rfidTag: 'RFID-XX-001',
           notes: 'Use with local ventilation.',
+          responsibleUsers: const [
+            ChemicalResponsibleUser(
+              id: 'staff_teacher',
+              name: '值班教师',
+              role: 'teacher',
+              email: 'teacher@smartlab.edu',
+              responsibilityType: 'custodian',
+            ),
+          ],
         ),
         Chemical(
           id: 'chem_xx_002',
@@ -276,6 +555,15 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
         unit: 'bottles',
         expiryDate: DateTime.now().add(const Duration(days: 120)),
         rfidTag: 'RFID-YL-001',
+        responsibleUsers: const [
+          ChemicalResponsibleUser(
+            id: 'staff_admin',
+            name: '实验室管理员',
+            role: 'admin',
+            email: 'admin@smartlab.edu',
+            responsibilityType: 'custodian',
+          ),
+        ],
       ),
       Chemical(
         id: 'chem_yl_002',
@@ -320,6 +608,61 @@ class ChemicalsBloc extends Bloc<ChemicalsEvent, ChemicalsState> {
         timestamp: DateTime.now().subtract(const Duration(hours: 2)),
         notes: 'Inventory synced for ${chemical.cabinetId}.',
       );
+    }).toList();
+  }
+
+  List<LabMember> _buildMockMembers(String labId) {
+    const members = [
+      LabMember(
+        id: 'staff_admin',
+        name: '实验室管理员',
+        username: 'admin',
+        role: 'admin',
+        email: 'admin@smartlab.edu',
+        phone: '13800000001',
+        accessibleLabIds: ['lab_yuanlou_806', 'lab_xixue_xinke'],
+      ),
+      LabMember(
+        id: 'staff_teacher',
+        name: '值班教师',
+        username: 'teacher',
+        role: 'teacher',
+        email: 'teacher@smartlab.edu',
+        phone: '13800000002',
+        accessibleLabIds: ['lab_yuanlou_806', 'lab_xixue_xinke'],
+      ),
+    ];
+    return members.where((member) => member.accessibleLabIds.contains(labId)).toList();
+  }
+
+  List<Map<String, dynamic>> _buildCabinetSummaries(List<Chemical> chemicals) {
+    final cabinets = <String, Map<String, dynamic>>{};
+    for (final chemical in chemicals) {
+      final cabinet = cabinets.putIfAbsent(
+        chemical.cabinetId,
+        () => {
+          'cabinetId': chemical.cabinetId,
+          'shelves': <String>{},
+          'chemicalCount': 0,
+          'lowStockCount': 0,
+          'pendingReviewCount': 0,
+        },
+      );
+      (cabinet['shelves'] as Set<String>).add(chemical.shelfCode);
+      cabinet['chemicalCount'] = (cabinet['chemicalCount'] as int) + 1;
+      if (chemical.isLowStock) {
+        cabinet['lowStockCount'] = (cabinet['lowStockCount'] as int) + 1;
+      }
+      if (chemical.status == ChemicalStatus.pendingReview || chemical.isExpiringSoon) {
+        cabinet['pendingReviewCount'] = (cabinet['pendingReviewCount'] as int) + 1;
+      }
+    }
+
+    return cabinets.values.map((item) {
+      return {
+        ...item,
+        'shelves': ((item['shelves'] as Set<String>).toList()..sort()).join(', '),
+      };
     }).toList();
   }
 }

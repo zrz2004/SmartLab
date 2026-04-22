@@ -2,6 +2,37 @@ import { devices as memoryDevices, labs as memoryLabs } from '../data/store.js';
 import { isDatabaseConfigured, isLegacySchema, query } from '../db.js';
 import { getSupportedLegacyLabIds, toDatabaseLabId, toExternalLabId } from '../utils/lab-mapper.js';
 
+const legacySyntheticDeviceMap = new Map([
+  ['yl806_env_01', {
+    name: '环境传感器1',
+    type: 'environmentSensor',
+    labId: 'lab_yuanlou_806',
+    position: '天花板中部',
+    sensorTypes: ['temperature', 'humidity', 'voc', 'smoke']
+  }],
+  ['yl806_pwr_01', {
+    name: '总电源监测',
+    type: 'powerMonitor',
+    labId: 'lab_yuanlou_806',
+    position: '配电柜',
+    sensorTypes: ['current']
+  }],
+  ['xx_pwr_01', {
+    name: '总电源监测',
+    type: 'powerMonitor',
+    labId: 'lab_xixue_xinke',
+    position: '配电柜',
+    sensorTypes: ['current']
+  }],
+  ['xx_water_01', {
+    name: '水路传感器',
+    type: 'waterSensor',
+    labId: 'lab_xixue_xinke',
+    position: '水槽区域',
+    sensorTypes: ['water_leak']
+  }]
+]);
+
 function mapSensorTypeToDeviceType(sensorType) {
   switch (sensorType) {
     case 'temperature':
@@ -36,6 +67,13 @@ function buildLegacyTelemetry(sensorType, value) {
     default:
       return { value: numericValue };
   }
+}
+
+function mergeLegacyTelemetry(baseTelemetry, patchTelemetry) {
+  return {
+    ...baseTelemetry,
+    ...patchTelemetry
+  };
 }
 
 class DeviceRepository {
@@ -129,6 +167,11 @@ class DeviceRepository {
     }
 
     if (await isLegacySchema()) {
+      const syntheticDevice = await this._getLegacySyntheticDevice(deviceId);
+      if (syntheticDevice) {
+        return syntheticDevice;
+      }
+
       const result = await query(
         `
         select
@@ -193,26 +236,70 @@ class DeviceRepository {
     }
 
     if (await isLegacySchema()) {
-      const sensorType = device.metadata?.sensorType ?? 'temperature';
       const queryStart = Number.isFinite(start) ? new Date(start * 1000) : new Date(Date.now() - 24 * 60 * 60 * 1000);
       const queryEnd = Number.isFinite(end) ? new Date(end * 1000) : new Date();
-      const result = await query(
-        `
-        select value, timestamp
-        from sensor_readings
-        where sensor_id = $1
-          and timestamp between $2 and $3
-        order by timestamp asc
-        `,
-        [Number(deviceId), queryStart.toISOString(), queryEnd.toISOString()]
-      );
+      const syntheticMeta = device.metadata?.synthetic == true
+          ? legacySyntheticDeviceMap.get(deviceId)
+          : null;
 
-      if (result.rowCount > 0) {
-        return result.rows.map((row) => ({
-          timestamp: row.timestamp,
-          deviceId,
-          values: buildLegacyTelemetry(sensorType, row.value)
-        }));
+      if (syntheticMeta) {
+        const result = await query(
+          `
+          select s.type as sensor_type, sr.value, sr.timestamp
+          from sensors s
+          join sensor_readings sr on sr.sensor_id = s.id
+          where s.lab_id = $1
+            and s.type = any($2::text[])
+            and sr.timestamp between $3 and $4
+          order by sr.timestamp asc
+          `,
+          [
+            toDatabaseLabId(syntheticMeta.labId),
+            syntheticMeta.sensorTypes,
+            queryStart.toISOString(),
+            queryEnd.toISOString()
+          ]
+        );
+
+        if (result.rowCount > 0) {
+          const grouped = new Map();
+          for (const row of result.rows) {
+            const key = new Date(row.timestamp).toISOString();
+            const current = grouped.get(key) ?? {};
+            grouped.set(
+              key,
+              mergeLegacyTelemetry(current, buildLegacyTelemetry(row.sensor_type, row.value))
+            );
+          }
+
+          return [...grouped.entries()]
+              .sort((left, right) => left[0].localeCompare(right[0]))
+              .map(([timestamp, values]) => ({
+                timestamp,
+                deviceId,
+                values
+              }));
+        }
+      } else {
+        const sensorType = device.metadata?.sensorType ?? 'temperature';
+        const result = await query(
+          `
+          select value, timestamp
+          from sensor_readings
+          where sensor_id = $1
+            and timestamp between $2 and $3
+          order by timestamp asc
+          `,
+          [Number(deviceId), queryStart.toISOString(), queryEnd.toISOString()]
+        );
+
+        if (result.rowCount > 0) {
+          return result.rows.map((row) => ({
+            timestamp: row.timestamp,
+            deviceId,
+            values: buildLegacyTelemetry(sensorType, row.value)
+          }));
+        }
       }
     }
 
@@ -320,6 +407,68 @@ class DeviceRepository {
       ]
     );
     return result.rows[0] ?? null;
+  }
+
+  async _getLegacySyntheticDevice(deviceId) {
+    const definition = legacySyntheticDeviceMap.get(String(deviceId));
+    if (!definition) {
+      return null;
+    }
+
+    const result = await query(
+      `
+      select
+        s.type as sensor_type,
+        s.status,
+        sr.value as latest_value,
+        sr.timestamp as latest_timestamp
+      from sensors s
+      left join lateral (
+        select value, timestamp
+        from sensor_readings
+        where sensor_id = s.id
+        order by timestamp desc
+        limit 1
+      ) sr on true
+      where s.lab_id = $1
+        and s.type = any($2::text[])
+      order by s.id
+      `,
+      [toDatabaseLabId(definition.labId), definition.sensorTypes]
+    );
+
+    if (result.rowCount === 0) {
+      return null;
+    }
+
+    var telemetry = {};
+    var status = 'online';
+    for (const row of result.rows) {
+      telemetry = mergeLegacyTelemetry(
+        telemetry,
+        buildLegacyTelemetry(row.sensor_type, row.latest_value)
+      );
+      if (row.status && row.status !== 'online') {
+        status = row.status;
+      }
+    }
+
+    return {
+      id: String(deviceId),
+      name: definition.name,
+      type: definition.type,
+      lab_id: definition.labId,
+      position: definition.position,
+      status,
+      lab_name: memoryLabs.find((item) => item.id === definition.labId)?.name ?? definition.labId,
+      firmware_version: 'legacy-db',
+      protocol: 'HTTP / PostgreSQL',
+      telemetry,
+      metadata: {
+        synthetic: true,
+        sensorTypes: definition.sensorTypes
+      }
+    };
   }
 }
 

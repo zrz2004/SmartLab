@@ -5,23 +5,23 @@ const now = () => new Date().toISOString();
 export const labs = [
   {
     id: 'lab_yuanlou_806',
-    name: 'Yuanlou 806',
+    name: '院楼806实验室',
     buildingId: 'building_yuanlou',
-    buildingName: 'School of Information Science Building',
+    buildingName: '信息科学楼',
     floor: '8F',
     roomNumber: '806',
     type: 'computer',
-    description: 'Computer lab'
+    description: '计算机与信息安全实验室'
   },
   {
     id: 'lab_xixue_xinke',
-    name: 'Xixue Xinke Lab',
+    name: '西学楼一楼信科实验室',
     buildingId: 'building_xixue',
-    buildingName: 'Xixue Building',
+    buildingName: '西学楼',
     floor: '1F',
     roomNumber: '101',
     type: 'electronics',
-    description: 'Electronics lab'
+    description: '信科综合实验室'
   }
 ];
 
@@ -82,10 +82,10 @@ export const users = [
     id: 'user_admin',
     username: 'admin',
     password: 'admin123',
-    name: 'System Admin',
+    name: '实验室管理员',
     role: 'admin',
     email: 'admin@smartlab.edu',
-    department: 'SmartLab',
+    department: '智慧实验室中心',
     phone: '13800000000',
     accessibleLabIds: labs.map((item) => item.id),
     currentLabId: null,
@@ -97,10 +97,10 @@ export const users = [
     id: 'user_teacher',
     username: 'teacher',
     password: 'teacher123',
-    name: 'Lab Teacher',
+    name: '值班教师',
     role: 'teacher',
     email: 'teacher@smartlab.edu',
-    department: 'School of Information Science',
+    department: '信息科学学院',
     phone: '13800000001',
     accessibleLabIds: labs.map((item) => item.id),
     currentLabId: null,
@@ -112,10 +112,10 @@ export const users = [
     id: 'user_graduate',
     username: 'graduate',
     password: 'graduate123',
-    name: 'Graduate Student',
+    name: '研究生助理',
     role: 'graduate',
     email: 'graduate@smartlab.edu',
-    department: 'School of Information Science',
+    department: '信息科学学院',
     phone: '13800000002',
     accessibleLabIds: ['lab_yuanlou_806'],
     currentLabId: null,
@@ -127,10 +127,10 @@ export const users = [
     id: 'user_student',
     username: 'student',
     password: 'student123',
-    name: 'Lab Assistant',
+    name: '实验室助理',
     role: 'undergraduate',
     email: 'student@smartlab.edu',
-    department: 'School of Information Science',
+    department: '信息科学学院',
     phone: '13800000003',
     accessibleLabIds: ['lab_yuanlou_806'],
     currentLabId: null,
@@ -151,10 +151,10 @@ export const alerts = [
     id: 'alert_sensor_001',
     type: 'temperatureHigh',
     level: 'warning',
-    title: 'Temperature warning',
-    message: 'Temperature reached 28.5 C in Yuanlou 806.',
+    title: '温度预警',
+    message: '院楼806实验室温度达到 28.5°C。',
     device_id: 'yl806_env_01',
-    device_name: 'Env Sensor 1',
+    device_name: '环境传感器 1',
     room_id: '806',
     building_id: 'building_yuanlou',
     timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
@@ -165,10 +165,10 @@ export const alerts = [
     id: 'alert_power_001',
     type: 'leakageCurrent',
     level: 'critical',
-    title: 'Leakage current critical',
-    message: 'Leakage current reached 32mA in Xixue Xinke Lab.',
+    title: '漏电流严重警告',
+    message: '西学楼一楼信科实验室漏电流达到 32mA。',
     device_id: 'xx_pwr_01',
-    device_name: 'Power Monitor',
+    device_name: '总电源监测',
     room_id: '101',
     building_id: 'building_xixue',
     timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
@@ -180,34 +180,34 @@ export const alerts = [
 export const devices = [
   {
     id: 'yl806_env_01',
-    name: 'Env Sensor 1',
+    name: '环境传感器 1',
     type: 'environmentSensor',
     lab_id: 'lab_yuanlou_806',
-    position: 'Ceiling center',
+    position: '天花板中央',
     status: 'online'
   },
   {
     id: 'yl806_pwr_01',
-    name: 'Power Monitor',
+    name: '总电源监测',
     type: 'powerMonitor',
     lab_id: 'lab_yuanlou_806',
-    position: 'Power cabinet',
+    position: '配电柜',
     status: 'online'
   },
   {
     id: 'xx_pwr_01',
-    name: 'Power Monitor',
+    name: '总电源监测',
     type: 'powerMonitor',
     lab_id: 'lab_xixue_xinke',
-    position: 'Power cabinet',
+    position: '配电柜',
     status: 'warning'
   },
   {
     id: 'xx_water_01',
-    name: 'Water Sensor',
+    name: '水路传感器',
     type: 'waterSensor',
     lab_id: 'lab_xixue_xinke',
-    position: 'Sink area',
+    position: '水槽区域',
     status: 'online'
   }
 ];
@@ -216,28 +216,28 @@ export const chemicals = [
   {
     id: 'chem_yl_001',
     lab_id: 'lab_yuanlou_806',
-    name: 'Isopropyl Alcohol',
+    name: '异丙醇',
     cas_number: '67-63-0',
     cabinet_id: 'CAB-01',
     shelf_code: '01-02',
     hazard_class: 'flammable',
     status: 'inStock',
     quantity: 6,
-    unit: 'bottles',
+    unit: '瓶',
     expiry_date: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(),
     rfid_tag: 'RFID-YL-001'
   },
   {
     id: 'chem_xx_001',
     lab_id: 'lab_xixue_xinke',
-    name: 'Acetone',
+    name: '丙酮',
     cas_number: '67-64-1',
     cabinet_id: 'CAB-A',
     shelf_code: 'A-01',
     hazard_class: 'flammable',
     status: 'inStock',
     quantity: 4,
-    unit: 'bottles',
+    unit: '瓶',
     expiry_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
     rfid_tag: 'RFID-XX-001'
   }
@@ -247,11 +247,11 @@ export const chemicalLogs = [
   {
     id: 'chem_log_001',
     chemical_id: 'chem_yl_001',
-    action: 'audit',
+    action: '盘点',
     quantity: 6,
     performed_by: 'system',
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    notes: 'Inventory synced'
+    notes: '库存已同步'
   }
 ];
 

@@ -123,6 +123,14 @@ class LocalStorageService {
     await saveSetting('theme_mode', mode);
   }
 
+  String getLanguageCode() {
+    return getSetting<String>('language_code', defaultValue: 'zh') ?? 'zh';
+  }
+
+  Future<void> setLanguageCode(String languageCode) async {
+    await saveSetting('language_code', languageCode);
+  }
+
   bool getNotificationEnabled() {
     return getSetting<bool>('notification_enabled', defaultValue: true) ?? true;
   }
@@ -177,5 +185,83 @@ class LocalStorageService {
   Future<void> replacePendingUploads(List<Map<String, dynamic>> items) async {
     final box = Hive.box(_uploadsBox);
     await box.put('items', items);
+  }
+
+  Future<void> saveLabUploadTimestamp(String labId, DateTime timestamp) async {
+    await saveSetting('lab_upload_$labId', timestamp.toIso8601String());
+  }
+
+  DateTime? getLabUploadTimestamp(String labId) {
+    final raw = getSetting<String>('lab_upload_$labId');
+    if (raw == null || raw.isEmpty) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  bool hasShownUploadReminder({
+    required String userId,
+    required String labId,
+    required String slotKey,
+    required DateTime date,
+  }) {
+    final dayKey = _formatDayKey(date);
+    return getSetting<bool>(
+          'upload_reminder_shown_${userId}_${labId}_${slotKey}_$dayKey',
+          defaultValue: false,
+        ) ??
+        false;
+  }
+
+  Future<void> markUploadReminderShown({
+    required String userId,
+    required String labId,
+    required String slotKey,
+    required DateTime date,
+  }) async {
+    final dayKey = _formatDayKey(date);
+    await saveSetting(
+      'upload_reminder_shown_${userId}_${labId}_${slotKey}_$dayKey',
+      true,
+    );
+  }
+
+  Future<void> saveLabReminderSettings(
+    String labId,
+    Map<String, dynamic> settings,
+  ) async {
+    await saveSetting('lab_reminder_settings_$labId', settings);
+  }
+
+  Map<String, dynamic>? getLabReminderSettings(String labId) {
+    final raw = getSetting<dynamic>('lab_reminder_settings_$labId');
+    if (raw is Map) {
+      return raw.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+    }
+    return null;
+  }
+
+  Future<void> saveScheduledUploadReminderIds(List<int> ids) async {
+    await saveSetting('scheduled_upload_reminder_ids', ids);
+  }
+
+  List<int> getScheduledUploadReminderIds() {
+    final raw = getSetting<dynamic>(
+      'scheduled_upload_reminder_ids',
+      defaultValue: const <dynamic>[],
+    );
+    if (raw is List) {
+      return raw
+          .map((item) => int.tryParse(item.toString()))
+          .whereType<int>()
+          .toList();
+    }
+    return const <int>[];
+  }
+
+  String _formatDayKey(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}'
+        '${date.month.toString().padLeft(2, '0')}'
+        '${date.day.toString().padLeft(2, '0')}';
   }
 }

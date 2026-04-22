@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 
+import '../localization/locale_cubit.dart';
 import '../../features/alerts/presentation/bloc/alerts_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/chemicals/presentation/bloc/chemicals_bloc.dart';
@@ -11,6 +12,8 @@ import '../services/api_service.dart';
 import '../services/evidence_service.dart';
 import '../services/local_storage_service.dart';
 import '../services/mqtt_service.dart';
+import '../services/notification_service.dart';
+import '../services/upload_reminder_service.dart';
 
 final getIt = GetIt.instance;
 
@@ -22,10 +25,29 @@ Future<void> configureDependencies() async {
   await localStorageService.initialize();
   getIt.registerLazySingleton<LocalStorageService>(() => localStorageService);
 
+  final notificationService = NotificationService(
+    localStorageService: localStorageService,
+  );
+  await notificationService.initialize();
+  getIt.registerLazySingleton<NotificationService>(() => notificationService);
+
+  getIt.registerLazySingleton<LocaleCubit>(
+    () => LocaleCubit(storageService: localStorageService),
+  );
+
+  getIt.registerLazySingleton<UploadReminderService>(
+    () => UploadReminderService(
+      localStorageService: getIt<LocalStorageService>(),
+      apiService: getIt<ApiService>(),
+      notificationService: getIt<NotificationService>(),
+    ),
+  );
+
   getIt.registerLazySingleton<EvidenceService>(
     () => EvidenceService(
       apiService: getIt<ApiService>(),
       localStorageService: getIt<LocalStorageService>(),
+      uploadReminderService: getIt<UploadReminderService>(),
     ),
   );
 
@@ -40,6 +62,7 @@ Future<void> configureDependencies() async {
     () => DashboardBloc(
       mqttService: getIt<MqttService>(),
       apiService: getIt<ApiService>(),
+      storageService: getIt<LocalStorageService>(),
     ),
   );
 

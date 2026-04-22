@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/control_switch.dart';
@@ -29,6 +30,7 @@ class _PowerPageState extends State<PowerPage> {
   Widget build(BuildContext context) {
     return BlocBuilder<PowerBloc, PowerState>(
       builder: (context, state) {
+        final l10n = context.l10n;
         final authState = context.watch<AuthBloc>().state;
         final currentLabId = authState.currentLabId ?? 'lab_yuanlou_806';
         return CustomScrollView(
@@ -36,15 +38,15 @@ class _PowerPageState extends State<PowerPage> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Text('Power', style: Theme.of(context).textTheme.titleLarge),
+                child: Text(l10n.t('power.title'), style: Theme.of(context).textTheme.titleLarge),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: EvidenceActionsCard(
-                  title: 'AI evidence for power',
-                  description: 'Review breakers, sockets and oven power safety from images.',
+                  title: l10n.t('power.evidenceTitle'),
+                  description: l10n.t('power.evidenceDesc'),
                   labId: currentLabId,
                   sceneType: 'power',
                   deviceType: 'main_power',
@@ -69,7 +71,12 @@ class _PowerPageState extends State<PowerPage> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: Text('Leakage ${state.leakageCurrent?.toStringAsFixed(1) ?? '0.0'} mA'),
+                child: Text(
+                  l10n.t(
+                    'power.leakage',
+                    params: {'value': state.leakageCurrent?.toStringAsFixed(1) ?? '0.0'},
+                  ),
+                ),
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
@@ -85,7 +92,7 @@ class _PowerPageState extends State<PowerPage> {
                         title: socket.name,
                         subtitle: socket.isOn
                             ? '${socket.power.toStringAsFixed(0)} W'
-                            : 'Off',
+                          : l10n.t('common.off'),
                         isOn: socket.isOn,
                         icon: Icons.power,
                         activeColor: AppColors.power,
@@ -106,9 +113,10 @@ class _PowerPageState extends State<PowerPage> {
   }
 
   Future<void> _handleMainPowerToggle(BuildContext context, PowerState state) async {
+    final l10n = context.l10n;
     if (!context.read<AuthBloc>().state.canControlDevices) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No device control permission')),
+        SnackBar(content: Text(l10n.t('power.noPermission'))),
       );
       return;
     }
@@ -118,18 +126,18 @@ class _PowerPageState extends State<PowerPage> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Confirm shutdown'),
-          content: const Text('Check lab safety before cutting main power.'),
+          title: Text(l10n.t('power.confirmShutdownTitle')),
+          content: Text(l10n.t('power.confirmShutdownDesc')),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.t('common.cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.t('common.confirm'))),
           ],
         ),
       );
       if (confirmed != true) return;
       try {
         final authenticated = await _localAuth.authenticate(
-          localizedReason: 'Confirm identity before shutdown',
+          localizedReason: l10n.t('power.biometricReason'),
           options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
         );
         if (!authenticated) return;
@@ -168,16 +176,24 @@ class _MainPowerCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Power ${isOn ? power.toStringAsFixed(0) : '0'} W', style: const TextStyle(color: Colors.white)),
+          Text(
+            context.l10n.t('power.powerValue', params: {'value': isOn ? power.toStringAsFixed(0) : '0'}),
+            style: const TextStyle(color: Colors.white),
+          ),
           const SizedBox(height: AppSpacing.sm),
-          Text('Voltage ${voltage.toStringAsFixed(1)} V', style: const TextStyle(color: Colors.white)),
+          Text(
+            context.l10n.t('power.voltageValue', params: {'value': voltage.toStringAsFixed(1)}),
+            style: const TextStyle(color: Colors.white),
+          ),
           const SizedBox(height: AppSpacing.lg),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: !canControl || isControlling ? null : onToggle,
               style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.primary),
-              child: isControlling ? const CircularProgressIndicator() : Text(isOn ? 'Shutdown' : 'Restore'),
+              child: isControlling
+                  ? const CircularProgressIndicator()
+                  : Text(isOn ? context.l10n.t('power.shutdown') : context.l10n.t('power.restore')),
             ),
           ),
         ],

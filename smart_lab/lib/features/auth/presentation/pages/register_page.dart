@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../domain/entities/user.dart';
@@ -38,6 +39,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final isLoading = context.select((AuthBloc bloc) => bloc.state.isLoading);
+
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state.status == AuthStatus.registrationPending) {
@@ -50,7 +54,8 @@ class _RegisterPageState extends State<RegisterPage> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('Register')),
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: Text(l10n.t('register.title'))),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Form(
@@ -59,77 +64,129 @@ class _RegisterPageState extends State<RegisterPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'New accounts require admin review before login is allowed.',
+                  l10n.t('register.desc'),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                _buildField(controller: _nameController, label: 'Name', validator: _required),
-                const SizedBox(height: AppSpacing.lg),
-                _buildField(
-                  controller: _usernameController,
-                  label: 'Student ID / Employee ID',
+                _RegisterField(
+                  controller: _nameController,
+                  enabled: !isLoading,
+                  label: l10n.t('register.name'),
+                  hint: l10n.t('register.name'),
                   validator: _required,
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                _buildField(
+                _RegisterField(
+                  controller: _usernameController,
+                  enabled: !isLoading,
+                  label: l10n.t('register.studentOrEmployeeId'),
+                  hint: l10n.t('register.studentOrEmployeeId'),
+                  validator: _required,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _RegisterField(
                   controller: _emailController,
-                  label: 'Email',
+                  enabled: !isLoading,
+                  label: l10n.t('register.email'),
+                  hint: l10n.t('register.email'),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Enter email';
-                    if (!value.contains('@')) return 'Invalid email';
+                    if (value == null || value.trim().isEmpty) return l10n.t('register.enterEmail');
+                    if (!value.contains('@')) return l10n.t('register.invalidEmail');
                     return null;
                   },
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                _buildField(
+                _RegisterField(
                   controller: _phoneController,
-                  label: 'Phone',
+                  enabled: !isLoading,
+                  label: l10n.t('register.phone'),
+                  hint: l10n.t('register.phone'),
                   keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                DropdownButtonFormField<UserRole>(
-                  initialValue: _selectedRole,
-                  decoration: const InputDecoration(
-                    labelText: 'Requested role',
-                    border: OutlineInputBorder(),
+                Text(
+                  l10n.t('register.requestedRole'),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.inputBackground,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    border: Border.all(color: AppColors.border),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: UserRole.undergraduate, child: Text('Assistant')),
-                    DropdownMenuItem(value: UserRole.graduate, child: Text('Graduate')),
-                    DropdownMenuItem(value: UserRole.teacher, child: Text('Teacher')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => _selectedRole = value);
-                  },
+                  alignment: Alignment.centerLeft,
+                  child: DropdownButtonFormField<UserRole>(
+                    initialValue: _selectedRole,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      isDense: true,
+                    ),
+                    items: [
+                      DropdownMenuItem(value: UserRole.undergraduate, child: Text(l10n.t('role.undergraduate'))),
+                      DropdownMenuItem(value: UserRole.graduate, child: Text(l10n.t('role.graduate'))),
+                      DropdownMenuItem(value: UserRole.teacher, child: Text(l10n.t('role.teacher'))),
+                    ],
+                    onChanged: isLoading
+                        ? null
+                        : (value) {
+                            if (value != null) setState(() => _selectedRole = value);
+                          },
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                _buildField(
+                _RegisterField(
                   controller: _passwordController,
-                  label: 'Password',
+                  enabled: !isLoading,
+                  label: l10n.t('register.password'),
+                  hint: l10n.t('register.password'),
                   obscureText: true,
                   validator: (value) {
-                    if (value == null || value.length < 6) return 'At least 6 chars';
+                    if (value == null || value.length < 6) return l10n.t('register.atLeast6Chars');
                     return null;
                   },
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                _buildField(
+                _RegisterField(
                   controller: _confirmPasswordController,
-                  label: 'Confirm password',
+                  enabled: !isLoading,
+                  label: l10n.t('register.confirmPassword'),
+                  hint: l10n.t('register.confirmPassword'),
                   obscureText: true,
                   validator: (value) =>
-                      value != _passwordController.text ? 'Passwords do not match' : null,
+                      value != _passwordController.text ? l10n.t('register.passwordMismatch') : null,
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: FilledButton(
-                    onPressed: _submit,
-                    child: const Text('Submit'),
+                    onPressed: isLoading ? null : _submit,
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(l10n.t('common.submit')),
                   ),
                 ),
               ],
@@ -140,29 +197,8 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _buildField({
-    required TextEditingController controller,
-    required String label,
-    TextInputType keyboardType = TextInputType.text,
-    bool obscureText = false,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        filled: true,
-        fillColor: AppColors.inputBackground,
-      ),
-    );
-  }
-
   String? _required(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Required';
+    if (value == null || value.trim().isEmpty) return context.l10n.t('register.required');
     return null;
   }
 
@@ -178,5 +214,75 @@ class _RegisterPageState extends State<RegisterPage> {
             requestedRole: _selectedRole,
           ),
         );
+  }
+}
+
+class _RegisterField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool enabled;
+  final String label;
+  final String hint;
+  final TextInputType keyboardType;
+  final bool obscureText;
+  final String? Function(String?)? validator;
+
+  const _RegisterField({
+    required this.controller,
+    required this.enabled,
+    required this.label,
+    required this.hint,
+    this.keyboardType = TextInputType.text,
+    this.obscureText = false,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: controller,
+          enabled: enabled,
+          keyboardType: keyboardType,
+          obscureText: obscureText,
+          validator: validator,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: hint,
+            filled: true,
+            fillColor: AppColors.inputBackground,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              borderSide: const BorderSide(color: AppColors.critical),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              borderSide: const BorderSide(color: AppColors.critical, width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

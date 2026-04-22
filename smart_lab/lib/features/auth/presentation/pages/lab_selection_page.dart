@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/lab_config.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -18,7 +19,9 @@ class LabSelectionPage extends StatelessWidget {
         }
       },
       builder: (context, state) {
+        final l10n = context.l10n;
         final labs = state.accessibleLabs;
+
         if (labs.length == 1 && state.currentLabId == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             context.read<AuthBloc>().add(AuthLabChanged(labId: labs.first.id));
@@ -35,25 +38,30 @@ class LabSelectionPage extends StatelessWidget {
                 children: [
                   const SizedBox(height: 40),
                   Text(
-                    'Select Lab',
+                    l10n.t('labSelection.title'),
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'This release is limited to the two labs defined in project docs.',
+                    l10n.t('labSelection.desc'),
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: AppColors.textSecondary,
                         ),
                   ),
                   const SizedBox(height: 12),
                   if (state.user != null)
-                    Text('${state.user!.name} (${state.user!.roleDisplayName})'),
+                    Text(
+                      '${state.user!.name} · ${l10n.t('role.${state.user!.role.name}')}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                    ),
                   const SizedBox(height: 32),
                   Expanded(
                     child: labs.isEmpty
-                        ? const Center(child: Text('No lab access assigned'))
+                        ? Center(child: Text(l10n.t('labSelection.noAccess')))
                         : ListView.separated(
                             itemCount: labs.length,
                             separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -78,7 +86,7 @@ class LabSelectionPage extends StatelessWidget {
                         context.go('/login');
                       },
                       icon: const Icon(Icons.logout),
-                      label: const Text('Logout'),
+                      label: Text(l10n.t('common.logout')),
                     ),
                   ),
                 ],
@@ -110,7 +118,7 @@ class _LabCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primaryLight.withValues(alpha: 0.1) : Colors.white,
+          color: selected ? AppColors.primaryLight.withValues(alpha: 0.10) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected ? AppColors.primary : Colors.transparent,
@@ -120,18 +128,61 @@ class _LabCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(lab.name, style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              lab.name,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
             const SizedBox(height: 8),
-            Text('${lab.buildingName} · ${lab.floor} · ${lab.roomNumber}'),
+            Text(
+              lab.englishName,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${lab.buildingName} · ${lab.floor} · ${lab.roomNumber}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                _chip('Env ${LabConfig.getDeviceCountByType(lab.id, 'environmentSensor')}'),
-                _chip('Socket ${LabConfig.getDeviceCountByType(lab.id, 'smartSocket')}'),
-                _chip('Door ${LabConfig.getDeviceCountByType(lab.id, 'doorSensor')}'),
-                _chip('Window ${LabConfig.getDeviceCountByType(lab.id, 'windowSensor')}'),
+                _chip(
+                  context.l10n.t(
+                    'labSelection.envCount',
+                    params: {
+                      'count': '${LabConfig.getDeviceCountByType(lab.id, 'environmentSensor')}',
+                    },
+                  ),
+                ),
+                _chip(
+                  context.l10n.t(
+                    'labSelection.socketCount',
+                    params: {
+                      'count': '${LabConfig.getDeviceCountByType(lab.id, 'smartSocket')}',
+                    },
+                  ),
+                ),
+                _chip(
+                  context.l10n.t(
+                    'labSelection.doorCount',
+                    params: {
+                      'count': '${LabConfig.getDeviceCountByType(lab.id, 'doorSensor')}',
+                    },
+                  ),
+                ),
+                _chip(
+                  context.l10n.t(
+                    'labSelection.windowCount',
+                    params: {
+                      'count': '${LabConfig.getDeviceCountByType(lab.id, 'windowSensor')}',
+                    },
+                  ),
+                ),
               ],
             ),
           ],

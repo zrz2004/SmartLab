@@ -8,6 +8,7 @@
     "start": "node src/index.js",
     "start:hidden": "powershell -ExecutionPolicy Bypass -File ./scripts/start-hidden.ps1",
     "stop:hidden": "powershell -ExecutionPolicy Bypass -File ./scripts/stop-hidden.ps1",
+    "nocodb:bootstrap": "node src/scripts/bootstrap-nocodb.js",
     "db:migrate": "node src/scripts/migrate.js",
     "db:seed": "node src/scripts/seed.js"
   },

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -57,11 +58,12 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final currentLabId = context.watch<AuthBloc>().state.currentLabId ?? 'lab_yuanlou_806';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Device detail'),
+        title: Text(l10n.t('device.detailTitle')),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -81,6 +83,13 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
           }
 
           final model = snapshot.data ?? _DeviceDetailViewModel.fallback(widget.deviceId);
+          final displayName = model.name == 'Unknown device' ? l10n.t('device.unknownDevice') : model.name;
+          final displayLocation = model.location == 'Unknown'
+              ? l10n.t('device.unknownLocation')
+              : model.location == 'Current lab'
+                  ? l10n.t('device.currentLab')
+                  : model.location;
+          final displayStatus = _localizedStatus(context, model.status);
 
           return CustomScrollView(
             slivers: [
@@ -90,18 +99,18 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(model.name, style: Theme.of(context).textTheme.titleLarge),
+                      Text(displayName, style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: AppSpacing.sm),
                       Wrap(
                         spacing: AppSpacing.sm,
                         runSpacing: AppSpacing.sm,
                         children: [
-                          _InfoChip(label: 'ID', value: model.id),
-                          _InfoChip(label: 'Type', value: model.type),
-                          _InfoChip(label: 'Status', value: model.status),
-                          _InfoChip(label: 'Protocol', value: model.protocol),
-                          _InfoChip(label: 'Firmware', value: model.firmware),
-                          _InfoChip(label: 'Location', value: model.location),
+                          _InfoChip(label: l10n.t('device.id'), value: model.id),
+                          _InfoChip(label: l10n.t('device.type'), value: model.type),
+                          _InfoChip(label: l10n.t('device.status'), value: displayStatus),
+                          _InfoChip(label: l10n.t('device.protocol'), value: model.protocol),
+                          _InfoChip(label: l10n.t('device.firmware'), value: model.firmware),
+                          _InfoChip(label: l10n.t('device.location'), value: displayLocation),
                         ],
                       ),
                     ],
@@ -112,8 +121,8 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                   child: EvidenceActionsCard(
-                    title: 'AI evidence for device',
-                    description: 'Attach photos when device telemetry is unavailable.',
+                    title: l10n.t('device.evidenceTitle'),
+                    description: l10n.t('device.evidenceDesc'),
                     labId: currentLabId,
                     sceneType: 'device',
                     deviceType: model.type,
@@ -133,7 +142,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                   ),
                   delegate: SliverChildListDelegate([
                     SensorGauge(
-                      label: 'Temp',
+                      label: l10n.t('environment.temp'),
                       value: model.temperature,
                       unit: 'C',
                       minValue: 0,
@@ -144,7 +153,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                       icon: Icons.thermostat,
                     ),
                     SensorGauge(
-                      label: 'Humidity',
+                      label: l10n.t('environment.humidity'),
                       value: model.humidity,
                       unit: '%',
                       minValue: 0,
@@ -163,7 +172,7 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                   child: RealtimeChart(
                     data: model.history,
-                    title: '24h trend',
+                    title: l10n.t('device.trend24h'),
                     unit: 'C',
                     lineColor: AppColors.environment,
                     warningThreshold: 28,
@@ -176,6 +185,21 @@ class _DeviceDetailPageState extends State<DeviceDetailPage> {
         },
       ),
     );
+  }
+
+  String _localizedStatus(BuildContext context, String status) {
+    switch (status.toLowerCase()) {
+      case 'online':
+        return context.l10n.t('deviceStatus.online');
+      case 'offline':
+        return context.l10n.t('deviceStatus.offline');
+      case 'warning':
+        return context.l10n.t('deviceStatus.warning');
+      case 'error':
+        return context.l10n.t('deviceStatus.error');
+      default:
+        return status;
+    }
   }
 }
 

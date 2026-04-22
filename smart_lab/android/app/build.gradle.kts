@@ -42,6 +42,38 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+}
+
+val renameReleaseApk by tasks.registering {
+    doLast {
+        val releaseApkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+        val flutterApkDir = layout.buildDirectory.dir("outputs/flutter-apk").get().asFile
+
+        copy {
+            from(releaseApkDir)
+            include("app-release.apk")
+            into(releaseApkDir)
+            rename("app-release.apk", "SmartLab.apk")
+        }
+
+        copy {
+            from(releaseApkDir)
+            include("app-release.apk")
+            into(flutterApkDir)
+        }
+
+        copy {
+            from(releaseApkDir)
+            include("app-release.apk")
+            into(flutterApkDir)
+            rename("app-release.apk", "SmartLab.apk")
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    finalizedBy(renameReleaseApk)
 }
 
 flutter {

@@ -43,6 +43,12 @@ class InspectionRepository {
         JSON.stringify(inspection.rawResponse ?? {})
       ]
     );
+    if (await isLegacySchema()) {
+      return {
+        ...result.rows[0],
+        lab_id: toExternalLabId(result.rows[0].lab_id)
+      };
+    }
     return result.rows[0];
   }
 
@@ -59,6 +65,59 @@ class InspectionRepository {
       };
     }
     return result.rows[0];
+  }
+
+  async getLatest({ labId, sceneType, deviceType, targetId }) {
+    if (!isDatabaseConfigured()) {
+      return memoryInspections.find((item) =>
+        (!labId || item.labId === labId) &&
+        (!sceneType || item.sceneType === sceneType) &&
+        (!deviceType || item.deviceType === deviceType) &&
+        (!targetId || item.targetId === targetId)
+      ) ?? null;
+    }
+
+    const legacySchema = await isLegacySchema();
+    const result = await query(
+      legacySchema
+          ? `
+            select *
+            from inspection_records
+            where ($1::int is null or lab_id = $1)
+              and ($2::text is null or scene_type = $2)
+              and ($3::text is null or device_type = $3)
+              and ($4::text is null or target_id = $4)
+            order by created_at desc
+            limit 1
+            `
+          : `
+            select *
+            from inspection_records
+            where ($1::text is null or lab_id = $1)
+              and ($2::text is null or scene_type = $2)
+              and ($3::text is null or device_type = $3)
+              and ($4::text is null or target_id = $4)
+            order by created_at desc
+            limit 1
+            `,
+      [
+        legacySchema ? toDatabaseLabId(labId) : labId ?? null,
+        sceneType ?? null,
+        deviceType ?? null,
+        targetId ?? null
+      ]
+    );
+    if (result.rowCount === 0) {
+      return null;
+    }
+    const row = result.rows[0];
+    if (legacySchema) {
+      return {
+        ...row,
+        lab_id: toExternalLabId(row.lab_id)
+      };
+    }
+    return row;
   }
 }
 

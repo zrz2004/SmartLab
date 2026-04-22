@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/safety_thresholds.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/evidence_actions_card.dart';
@@ -29,21 +30,22 @@ class _EnvironmentPageState extends State<EnvironmentPage> {
   Widget build(BuildContext context) {
     return BlocBuilder<EnvironmentBloc, EnvironmentState>(
       builder: (context, state) {
+        final l10n = context.l10n;
         final currentLabId = context.watch<AuthBloc>().state.currentLabId ?? 'lab_yuanlou_806';
         return CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Text('Environment', style: Theme.of(context).textTheme.titleLarge),
+                child: Text(l10n.t('environment.title'), style: Theme.of(context).textTheme.titleLarge),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: EvidenceActionsCard(
-                  title: 'AI evidence for environment',
-                  description: 'Use image review when hardware sensors are unavailable.',
+                  title: l10n.t('environment.evidenceTitle'),
+                  description: l10n.t('environment.evidenceDesc'),
                   labId: currentLabId,
                   sceneType: 'environment',
                   deviceType: 'environment_sensor',
@@ -62,7 +64,7 @@ class _EnvironmentPageState extends State<EnvironmentPage> {
                 ),
                 delegate: SliverChildListDelegate([
                   SensorGauge(
-                    label: 'Temp',
+                    label: l10n.t('environment.temp'),
                     value: state.currentTemperature ?? 24.0,
                     unit: 'C',
                     minValue: 0,
@@ -73,7 +75,7 @@ class _EnvironmentPageState extends State<EnvironmentPage> {
                     icon: Icons.thermostat,
                   ),
                   SensorGauge(
-                    label: 'Humidity',
+                    label: l10n.t('environment.humidity'),
                     value: state.currentHumidity ?? 45.0,
                     unit: '%',
                     minValue: 0,
@@ -94,7 +96,7 @@ class _EnvironmentPageState extends State<EnvironmentPage> {
                   data: state.temperatureHistory.isNotEmpty
                       ? state.temperatureHistory
                       : List.generate(24, (i) => FlSpot(i.toDouble(), 23 + (i % 6) * 0.35)),
-                  title: 'Temperature trend',
+                    title: l10n.t('environment.tempTrend'),
                   unit: 'C',
                   lineColor: AppColors.environment,
                   warningThreshold: SafetyThresholds.tempWarningMax,
@@ -106,7 +108,12 @@ class _EnvironmentPageState extends State<EnvironmentPage> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: Text('VOC ${state.currentVoc?.toStringAsFixed(0) ?? '120'} ppb'),
+                child: Text(
+                  l10n.t(
+                    'environment.voc',
+                    params: {'value': state.currentVoc?.toStringAsFixed(0) ?? '120'},
+                  ),
+                ),
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.bottomSafeArea)),

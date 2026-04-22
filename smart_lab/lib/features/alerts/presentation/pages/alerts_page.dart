@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/localization/dynamic_text_localizer.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/evidence_actions_card.dart';
@@ -25,12 +27,13 @@ class _AlertsPageState extends State<AlertsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final authState = context.watch<AuthBloc>().state;
     final currentLabId = authState.currentLabId ?? 'lab_yuanlou_806';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Alerts'),
+        title: Text(l10n.t('alerts.title')),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
       ),
       body: BlocBuilder<AlertsBloc, AlertsState>(
@@ -40,8 +43,8 @@ class _AlertsPageState extends State<AlertsPage> {
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 child: EvidenceActionsCard(
-                  title: 'AI evidence for alerts',
-                  description: 'Attach images and AI review to pending alerts.',
+                  title: l10n.t('alerts.evidenceTitle'),
+                  description: l10n.t('alerts.evidenceDesc'),
                   labId: currentLabId,
                   sceneType: 'alert',
                   deviceType: 'alert_center',
@@ -85,6 +88,8 @@ class _AlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localizedTitle = DynamicTextLocalizer.alertTitle(context, alert.title);
+    final localizedMessage = DynamicTextLocalizer.alertMessage(context, alert.message);
     final color = switch (alert.level) {
       AlertLevel.critical => AppColors.critical,
       AlertLevel.warning => AppColors.warning,
@@ -106,12 +111,12 @@ class _AlertCard extends StatelessWidget {
             children: [
               Icon(alert.type.icon, color: color),
               const SizedBox(width: AppSpacing.sm),
-              Expanded(child: Text(alert.title)),
-              if (isAi) const Text('AI'),
+              Expanded(child: Text(localizedTitle)),
+              if (isAi) Text(context.l10n.t('alerts.ai')),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          Text(alert.message),
+          Text(localizedMessage),
           const SizedBox(height: AppSpacing.sm),
           Text(alert.deviceName, style: const TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: AppSpacing.sm),
@@ -120,9 +125,9 @@ class _AlertCard extends StatelessWidget {
               Text('${alert.timestamp.hour.toString().padLeft(2, '0')}:${alert.timestamp.minute.toString().padLeft(2, '0')}'),
               const Spacer(),
               if (!alert.isAcknowledged)
-                TextButton(onPressed: canAcknowledge ? onAcknowledge : null, child: const Text('Ack'))
+                TextButton(onPressed: canAcknowledge ? onAcknowledge : null, child: Text(context.l10n.t('alerts.ack')))
               else
-                const Text('Acked'),
+                Text(context.l10n.t('alerts.acked')),
             ],
           ),
         ],

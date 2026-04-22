@@ -3,18 +3,20 @@ import { isDatabaseConfigured, isLegacySchema, query } from '../db.js';
 import { toDatabaseLabId, toExternalLabId } from '../utils/lab-mapper.js';
 
 class AlertRepository {
-  async list({ level, acknowledged, limit = 50 }) {
+  async list({ level, acknowledged, labId, limit = 50 }) {
     if (!isDatabaseConfigured()) {
       return memoryAlerts
           .filter((item) => {
             const matchesLevel = !level || item.level === level;
             const matchesAck = acknowledged === undefined ? true : String(item.is_acknowledged) === String(acknowledged);
-            return matchesLevel && matchesAck;
+            const matchesLab = !labId || item.lab_id === labId;
+            return matchesLevel && matchesAck && matchesLab;
           })
           .slice(0, limit);
     }
 
     if (await isLegacySchema()) {
+      const databaseLabId = labId ? toDatabaseLabId(labId) : null;
       const result = await query(
         `
         select
@@ -33,33 +35,37 @@ class AlertRepository {
         from alerts a
         left join sensors s on s.id = a.sensor_id
         where ($1::text is null or a.severity = $1)
+          and ($2::int is null or a.lab_id = $2)
           and (
-            $2::boolean is null
-            or ($2 = true and a.status = 'acknowledged')
-            or ($2 = false and a.status <> 'acknowledged')
+            $3::boolean is null
+            or ($3 = true and a.status = 'acknowledged')
+            or ($3 = false and a.status <> 'acknowledged')
           )
         order by a.created_at desc
-        limit $3
+        limit $4
         `,
-        [level ?? null, acknowledged ?? null, limit]
+        [level ?? null, databaseLabId, acknowledged ?? null, limit]
       );
 
-      return result.rows.map((row) => ({
-        id: row.id,
-        type: row.type,
-        level: row.severity,
-        title: row.title,
-        message: row.description,
-        device_id: row.device_id,
-        device_name: row.device_name ?? 'Legacy sensor',
-        lab_id: toExternalLabId(row.lab_id),
-        timestamp: row.created_at,
-        is_acknowledged: row.status === 'acknowledged',
-        acknowledged_at: row.acknowledged_at,
-        acknowledged_by: row.acknowledged_by?.toString() ?? null,
-        source: 'sensor',
-        review_status: row.status === 'acknowledged' ? 'reviewed' : 'pending_review'
-      }));
+      return result.rows.map((row) => {
+        const isAiAlert = String(row.title ?? '').toLowerCase() === 'ai image warning';
+        return {
+          id: row.id,
+          type: row.type,
+          level: row.severity,
+          title: row.title,
+          message: row.description,
+          device_id: isAiAlert ? (row.device_id ?? 'ai_camera') : row.device_id,
+          device_name: isAiAlert ? 'AI image inspection' : (row.device_name ?? 'Legacy sensor'),
+          lab_id: toExternalLabId(row.lab_id),
+          timestamp: row.created_at,
+          is_acknowledged: row.status === 'acknowledged',
+          acknowledged_at: row.acknowledged_at,
+          acknowledged_by: row.acknowledged_by?.toString() ?? null,
+          source: isAiAlert ? 'ai' : 'sensor',
+          review_status: row.status === 'acknowledged' ? 'reviewed' : 'pending_review'
+        };
+      });
     }
 
     const result = await query(
@@ -67,11 +73,12 @@ class AlertRepository {
       select *
       from alerts
       where ($1::text is null or level = $1)
-        and ($2::boolean is null or is_acknowledged = $2)
+        and ($2::text is null or lab_id = $2)
+        and ($3::boolean is null or is_acknowledged = $3)
       order by timestamp desc
-      limit $3
+      limit $4
       `,
-      [level ?? null, acknowledged ?? null, limit]
+      [level ?? null, labId ?? null, acknowledged ?? null, limit]
     );
     return result.rows;
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/localization/app_localizations.dart';
+import '../../core/localization/dynamic_text_localizer.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../features/alerts/domain/entities/alert.dart';
@@ -18,6 +20,10 @@ class AlertItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localizedTitle = alert.title.isEmpty
+        ? alert.type.name
+        : DynamicTextLocalizer.alertTitle(context, alert.title);
+    final localizedMessage = DynamicTextLocalizer.alertMessage(context, alert.message);
     final levelColor = _levelColor(alert.level);
 
     return InkWell(
@@ -44,17 +50,17 @@ class AlertItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    alert.title.isEmpty ? alert.type.name : alert.title,
+                    localizedTitle,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    alert.message,
+                    localizedMessage,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    _relativeTime(alert.timestamp),
+                    _relativeTime(context, alert.timestamp),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textTertiary),
                   ),
                 ],
@@ -63,7 +69,7 @@ class AlertItem extends StatelessWidget {
             if (!alert.isAcknowledged && onAcknowledge != null)
               TextButton(
                 onPressed: onAcknowledge,
-                child: const Text('Acknowledge'),
+                child: Text(context.l10n.t('alert.acknowledge')),
               ),
           ],
         ),
@@ -82,11 +88,18 @@ class AlertItem extends StatelessWidget {
     }
   }
 
-  String _relativeTime(DateTime timestamp) {
+  String _relativeTime(BuildContext context, DateTime timestamp) {
     final diff = DateTime.now().difference(timestamp);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inHours < 1) return '${diff.inMinutes} min ago';
-    if (diff.inDays < 1) return '${diff.inHours} h ago';
-    return '${timestamp.month}/${timestamp.day}';
+    if (diff.inMinutes < 1) return context.l10n.t('alert.justNow');
+    if (diff.inHours < 1) {
+      return context.l10n.t('alert.minutesAgo', params: {'minutes': '${diff.inMinutes}'});
+    }
+    if (diff.inDays < 1) {
+      return context.l10n.t('alert.hoursAgo', params: {'hours': '${diff.inHours}'});
+    }
+    return context.l10n.t(
+      'alert.dateShort',
+      params: {'month': '${timestamp.month}', 'day': '${timestamp.day}'},
+    );
   }
 }

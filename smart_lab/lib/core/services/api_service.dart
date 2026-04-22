@@ -205,6 +205,28 @@ class ApiService {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
+  Future<Map<String, dynamic>> getLabReminderSettings(String labId) async {
+    final response = await _dio.get(ApiEndpoints.labReminderSettings(labId));
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> updateLabReminderSettings({
+    required String labId,
+    required bool enabled,
+    required String firstReminderTime,
+    required String secondReminderTime,
+  }) async {
+    final response = await _dio.put(
+      ApiEndpoints.labReminderSettings(labId),
+      data: {
+        'enabled': enabled,
+        'first_reminder_time': firstReminderTime,
+        'second_reminder_time': secondReminderTime,
+      },
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<Map<String, dynamic>> uploadMedia({
     required List<int> fileBytes,
     required String fileName,
@@ -244,6 +266,24 @@ class ApiService {
 
   Future<Map<String, dynamic>> getAiInspection(String inspectionId) async {
     final response = await _dio.get('${ApiEndpoints.aiInspections}/$inspectionId');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> getLatestAiInspection({
+    required String labId,
+    required String sceneType,
+    required String deviceType,
+    String? targetId,
+  }) async {
+    final response = await _dio.get(
+      ApiEndpoints.latestAiInspection,
+      queryParameters: {
+        'labId': labId,
+        'sceneType': sceneType,
+        'deviceType': deviceType,
+        if (targetId != null) 'targetId': targetId,
+      },
+    );
     return Map<String, dynamic>.from(response.data as Map);
   }
 
@@ -338,8 +378,44 @@ class ApiService {
     return List<Map<String, dynamic>>.from(response.data as List);
   }
 
+  Future<List<Map<String, dynamic>>> getChemicalResponsibilities(String chemicalId) async {
+    final response = await _dio.get('${ApiEndpoints.chemicalInventory}/$chemicalId/responsibilities');
+    return List<Map<String, dynamic>>.from(response.data as List);
+  }
+
+  Future<Map<String, dynamic>> checkInChemical({
+    required String chemicalId,
+    required double quantity,
+    String? notes,
+  }) async {
+    final response = await _dio.post(
+      '${ApiEndpoints.chemicalInventory}/$chemicalId/check-in',
+      data: {
+        'quantity': quantity,
+        'notes': notes,
+      },
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> checkOutChemical({
+    required String chemicalId,
+    required double quantity,
+    String? notes,
+  }) async {
+    final response = await _dio.post(
+      '${ApiEndpoints.chemicalInventory}/$chemicalId/check-out',
+      data: {
+        'quantity': quantity,
+        'notes': notes,
+      },
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<List<Map<String, dynamic>>> getAlerts({
     String? level,
+    String? labId,
     bool? acknowledged,
     int limit = 50,
   }) async {
@@ -347,6 +423,7 @@ class ApiService {
       ApiEndpoints.alerts,
       queryParameters: {
         if (level != null) 'level': level,
+        if (labId != null) 'labId': labId,
         if (acknowledged != null) 'acknowledged': acknowledged,
         'limit': limit,
       },
@@ -368,5 +445,65 @@ class ApiService {
   Future<Map<String, dynamic>> getLabSafetyScore(String labId) async {
     final response = await _dio.get('${ApiEndpoints.labs}/$labId/safety-score');
     return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> getTelemetryLatest({
+    required String deviceId,
+  }) async {
+    final response = await _dio.get(
+      ApiEndpoints.telemetryLatest,
+      queryParameters: {'deviceId': deviceId},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> getLabUsers({
+    String? labId,
+  }) async {
+    final response = await _dio.get(
+      ApiEndpoints.users,
+      queryParameters: {
+        if (labId != null) 'labId': labId,
+      },
+    );
+    return List<Map<String, dynamic>>.from(response.data as List);
+  }
+
+  Future<Map<String, dynamic>> updateLabUser({
+    required String userId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final response = await _dio.put('/users/$userId', data: payload);
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> createChemical({
+    required Map<String, dynamic> payload,
+  }) async {
+    final response = await _dio.post(ApiEndpoints.chemicalInventory, data: payload);
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> updateChemical({
+    required String chemicalId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final response = await _dio.put('${ApiEndpoints.chemicalInventory}/$chemicalId', data: payload);
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<void> deleteChemical(String chemicalId) async {
+    await _dio.delete('${ApiEndpoints.chemicalInventory}/$chemicalId');
+  }
+
+  Future<List<Map<String, dynamic>>> updateChemicalResponsibilities({
+    required String chemicalId,
+    required List<String> userIds,
+  }) async {
+    final response = await _dio.put(
+      '${ApiEndpoints.chemicalInventory}/$chemicalId/responsibilities',
+      data: {'user_ids': userIds},
+    );
+    return List<Map<String, dynamic>>.from(response.data as List);
   }
 }

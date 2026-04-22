@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/localization/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 
@@ -97,11 +98,20 @@ class ControlSwitch extends StatelessWidget {
     showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(value ? 'Confirm enable' : 'Confirm disable'),
-        content: Text(confirmationMessage ?? 'Apply ${value ? 'enable' : 'disable'} to $title?'),
+        title: Text(value ? context.l10n.t('control.confirmEnable') : context.l10n.t('control.confirmDisable')),
+        content: Text(
+          confirmationMessage ??
+              context.l10n.t(
+                'control.applyChange',
+                params: {
+                  'title': title,
+                  'action': value ? context.l10n.t('common.enable') : context.l10n.t('common.disable'),
+                },
+              ),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Confirm')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(context.l10n.t('common.cancel'))),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(context.l10n.t('common.confirm'))),
         ],
       ),
     ).then((confirmed) {
